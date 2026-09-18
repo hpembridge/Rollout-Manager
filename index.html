@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rollout Manager</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+
+  <!-- ── Project config — only thing to change per sprint ── -->
+  <script>
+    const CONFIG = {
+      owner:           'hpembridge',
+      repo:            'Rollout-Manager',
+      title:           'Rollout Manager',
+      eyebrow:         'Job Maintenance',
+      sprintTrackerUrl:'https://hpembridge.github.io/Product-Management-Tool/',
+    };
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1d23;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a1d23;
+      color: #fff;
+      padding: 32px 48px 28px;
+    }
+    .header-inner { max-width: 900px; margin: auto; }
+
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #7b8fa6;
+      margin-bottom: 6px;
+    }
+    header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+      margin-bottom: 20px;
+    }
+
+    .quick-links { display: flex; gap: 10px; }
+    .quick-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7b8fa6;
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 6px;
+      transition: color .15s, border-color .15s;
+    }
+    .quick-link:hover { color: #c8d4e0; border-color: rgba(255,255,255,.2); }
+
+    main {
+      flex: 1;
+      padding: 40px 48px;
+      max-width: 996px;
+      margin: auto;
+      width: 100%;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #8e9aab;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #dde2ea;
+      margin-bottom: 16px;
+    }
+
+    /* Dev Notes */
+    .notes-section { margin-bottom: 36px; }
+
+    /* Inline markdown notes */
+    .notes-inline-card {
+      background: #fff;
+      border: 1px solid #dde2ea;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 10px;
+    }
+    .notes-inline-card h1, .notes-inline-card h2, .notes-inline-card h3 {
+      font-weight: 700; margin: 0 0 10px; color: #1a1d23; line-height: 1.3;
+    }
+    .notes-inline-card h1 { font-size: 18px; }
+    .notes-inline-card h2 { font-size: 15px; }
+    .notes-inline-card h3 { font-size: 13px; color: #4b5563; }
+    .notes-inline-card p  { font-size: 13px; line-height: 1.65; color: #374151; margin-bottom: 12px; }
+    .notes-inline-card ul, .notes-inline-card ol {
+      font-size: 13px; line-height: 1.65; color: #374151;
+      padding-left: 18px; margin-bottom: 12px;
+    }
+    .notes-inline-card li { margin-bottom: 4px; }
+    .notes-inline-card code {
+      font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+      background: #f3f4f6; border-radius: 4px; padding: 1px 5px; color: #6366f1;
+    }
+    .notes-inline-card pre {
+      background: #f3f4f6; border-radius: 6px; padding: 14px;
+      overflow-x: auto; margin-bottom: 12px;
+    }
+    .notes-inline-card pre code { background: none; padding: 0; color: #1a1d23; }
+    .notes-inline-card blockquote {
+      border-left: 3px solid #dde2ea; padding-left: 12px;
+      color: #6b7280; margin: 0 0 12px;
+    }
+    .notes-inline-card hr { border: none; border-top: 1px solid #edf0f4; margin: 20px 0; }
+    .notes-inline-card strong { font-weight: 700; color: #1a1d23; }
+    .notes-inline-card a { color: #6366f1; text-decoration: underline; }
+
+    /* Prototype cards */
+    .card-grid { display: flex; flex-direction: column; gap: 10px; }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #dde2ea;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      transition: box-shadow .15s, transform .15s;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-1px); }
+    .card-body { flex: 1; }
+    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .card p  { font-size: 12.5px; line-height: 1.5; color: #6b7280; }
+    .card-arrow { font-size: 12px; color: #9aa3b0; }
+
+    .status-msg { font-size: 13px; color: #8e9aab; }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #9aa3b0;
+      padding: 20px 48px;
+      border-top: 1px solid #dde2ea;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="eyebrow" id="hEyebrow"></div>
+      <h1 id="hTitle"></h1>
+      <div class="quick-links">
+        <a class="quick-link" id="lTracker" href="#" target="_blank">
+          <i class="fa-solid fa-chart-gantt"></i> Sprint Tracker
+        </a>
+        <a class="quick-link" id="lGithub" href="#" target="_blank">
+          <i class="fa-brands fa-github"></i> Project Files
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Prototypes. Listed here rather than read off the GitHub API, so
+         the page works opened straight off disk and before the repo is
+         pushed. Add a card when you add a page. -->
+    <div class="section-label">Prototypes</div>
+    <div class="card-grid" id="cardGrid">
+
+      <a class="card" href="rollout-manager.html">
+        <div class="card-body">
+          <h2>Rollout Manager</h2>
+          <p>The current prototype. Master tickets and a table per detail, then the
+             distribution list — every address on the rollout with a quantity per
+             version and how it ships.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right card-arrow"></i>
+      </a>
+
+      <a class="card" href="rollout-manager-table.html">
+        <div class="card-body">
+          <h2>Rollout Manager — table</h2>
+          <p>Earlier exploration: the distribution list as a plain table with row
+             selection and a bulk-edit modal, rather than a spreadsheet grid.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right card-arrow"></i>
+      </a>
+
+    </div>
+
+
+  </main>
+
+  <footer id="footerText"></footer>
+
+  <script>
+    // ── Apply static config ──
+    document.title                                    = CONFIG.title;
+    document.getElementById('hEyebrow').textContent    = CONFIG.eyebrow;
+    document.getElementById('hTitle').textContent      = CONFIG.title;
+    document.getElementById('footerText').textContent  = CONFIG.title + ' · Cleveland Menu Co.';
+    document.getElementById('lTracker').href = CONFIG.sprintTrackerUrl;
+    document.getElementById('lGithub').href  = `https://github.com/${CONFIG.owner}/${CONFIG.repo}`;
+
+    // ── Dev notes ──
+    // NOTES.md rendered inline, so the decisions and open questions are on
+    // the same page as the thing they are about. fetch() cannot read a
+    // sibling file over file://, so opened off disk this falls back to a
+    // link rather than an error.
+    (async function notes() {
+      const card = document.getElementById('notesCard');
+      try {
+        const r = await fetch('NOTES.md');
+        if (!r.ok) throw new Error(r.status);
+        card.innerHTML = marked.parse(await r.text());
+      } catch {
+        card.innerHTML =
+          '<p class="status-msg">Serve this folder over HTTP to read NOTES.md here — ' +
+          '<a href="NOTES.md">open the file</a>.</p>';
+      }
+    })();
+  </script>
+
+</body>
+</html>
