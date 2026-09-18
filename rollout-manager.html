@@ -1,0 +1,1595 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rollout Manager</title>
+    <script src="https://kit.fontawesome.com/da08280601.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="shared/css/design-tokens.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
+    <link rel="stylesheet" href="rollout-manager.css" />
+    <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
+    <script src="rollout-data.js"></script>
+    <script>
+      window.SIDEBAR_CONFIG = {
+        activeItem: 'Jobs',
+        user: { name: 'Healey Pembridge', role: 'ui/ux designer' }
+      };
+    </script>
+  </head>
+  <body>
+    <script src="shared/components/sidebar-component.js"></script>
+
+    <div class="main-content">
+
+      <!-- ══ Breadcrumb bar ═══════════════════════════════════ -->
+      <div class="breadcrumb-bar">
+        <nav class="breadcrumbs">
+          <a class="crumb" href="#"><i class="fa-regular fa-folder"></i> Jobs</a>
+          <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
+          <a class="crumb" href="#">Rollout Manager</a>
+          <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
+          <span class="crumb current" id="rolloutCrumb"></span>
+        </nav>
+      </div>
+
+      <!-- ══ Topbar ═══════════════════════════════════════════
+           Rollout name and the two rollout outputs.
+           ───────────────────────────────────────────────────── -->
+      <header class="rollout-topbar">
+        <div class="page-width rollout-topbar__inner">
+          <div class="rollout-title">
+            Rollout Manager <span class="rollout-title__sub" id="rolloutName"></span>
+          </div>
+
+          <div class="topbar-spacer"></div>
+
+          <!-- What a finished rollout is for. Undo and redo stay on
+               Cmd/Ctrl+Z and on the Undo action in each toast; the
+               toolbar carries the two outputs instead. -->
+          <button class="btn-secondary" type="button" id="shipTracker">
+            <i class="fa-regular fa-truck"></i> Create Ship Tracker
+          </button>
+          <button class="btn-primary" type="button" id="createTickets">
+            <i class="fa-regular fa-file-plus"></i> Create Tickets
+          </button>
+        </div>
+      </header>
+      <!-- ══ /Topbar ══════════════════════════════════════════ -->
+
+      <!-- ══ View tabs ════════════════════════════════════════
+           The shared .tab-btn in a .tab-row, same as the unit type
+           tabs on the inventory item page. renderChrome() toggles
+           .active (and aria-pressed for assistive tech).
+           ───────────────────────────────────────────────────── -->
+      <div class="rollout-tabs">
+        <div class="page-width">
+          <div class="tab-row" role="group" aria-label="View">
+            <button class="tab-btn active" type="button" id="tabMaster" aria-pressed="true">Master tickets</button>
+            <button class="tab-btn" type="button" id="tabDist" aria-pressed="false">Distribution list</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ Grid ═════════════════════════════════════════════
+           A view is a LIST of tables. The master tickets view is the
+           ticket table — where tickets are added, removed and given
+           their job header fields — followed by one table per detail
+           position, because several parts can go into the one piece
+           that ships and each part has its own specs. The distribution
+           list is a single table.
+
+           Each table is built in JS because its rows and columns are
+           the data (tickets × fields, or fields × addresses), but its
+           shell is the template below and its cell markup is one
+           shape, repeated:
+
+             <td class="cell num" data-t="1" data-r="3" data-c="2">
+               <span class="val">400</span>
+             </td>
+
+           data-t is which table; that <td> is the *ngFor body when
+           this becomes Angular.
+           ───────────────────────────────────────────────────── -->
+      <div class="viewhost" id="viewhost"></div>
+
+      <!-- One section per table: heading, then the scroller that holds
+           the table. renderTables() clones this once per table. -->
+      <template id="tableSectionTemplate">
+        <section class="grid-section">
+          <header class="grid-section__head">
+            <h2 class="grid-section__title"></h2>
+            <span class="grid-section__sub"></span>
+          </header>
+          <div class="gridwrap"><div class="page-width grid-host"></div></div>
+        </section>
+      </template>
+      <!-- ══ /Grid ════════════════════════════════════════════ -->
+
+    </div>
+    <!-- /.main-content -->
+
+<script>
+"use strict";
+
+/* ============================ DATA ============================ */
+
+/* ── Address fields ────────────────────────────────────────────
+   How an address ships, from the job maintenance shipping tab and its
+   ship-edit modal. One value per address: a property ships the same way
+   whichever version it is getting, so none of this varies by version.
+   ------------------------------------------------------------- */
+let FIELDS = [
+  {id:"carrier", name:"Carrier",                num:false},
+  {id:"account", name:"Account",                num:false},
+  {id:"method",  name:"Method",                 num:false},
+  {id:"attn",    name:"Attn",                   num:false},
+  {id:"notes",   name:"Additional information", num:false},
+];
+let FIELD = {};
+function reindexFields(){ FIELD = Object.fromEntries(FIELDS.map(f=>[f.id,f])); }
+reindexFields();
+
+/* The shipping fields a rollout can carry, so "+ Add field" offers the
+   same set job maintenance does. */
+const SHIP_CATALOG = [
+  {id:"carrier", name:"Carrier",                num:false},
+  {id:"account", name:"Account",                num:false},
+  {id:"method",  name:"Method",                 num:false},
+  {id:"attn",    name:"Attn",                   num:false},
+  {id:"notes",   name:"Additional information", num:false},
+];
+
+/* ── Job-level fields (the master tickets table) ────────────────
+   The job ticket header: one value per master ticket, nothing to do
+   with any detail. These are the only columns the master tickets table
+   carries, because a spec belongs to a part and a ticket can have
+   several parts — those live in the detail tables below it.
+
+   The catalog is the JM "Edit job information" modal
+   (PL-JM-1.25/modals/edit-job-modal), in its order, with its labels and
+   its select options. Two notes from that modal:
+     - it labels the job name field "Job Name" while the job header and
+       the duplicate-job modal both call it "Job Description". Using the
+       latter, since that is what the header shows and what this grid's
+       data calls it (version.desc).
+     - the three fields it offers a fixed list for (Job Type, Production
+       Type) edit here as a type-ahead rather than a dropdown: type,
+       take the completion, and a value that is not on the list is
+       refused. For Distribution is a checkbox, as it is there.
+   ------------------------------------------------------------- */
+const JOB_CATALOG = [
+  {id:"forDist",  name:"For Distribution", w:150, bool:true},
+  {id:"po",       name:"PO Number",        w:150},
+  {id:"poName",   name:"PO Name",          w:170},
+  {id:"desc",     name:"Job Description",  w:230},
+  {id:"jobType",  name:"Job Type",         w:200, options:["New Job","Re-run with Changes","Pull-Plate"]},
+  {id:"oldJob",   name:"Old Job Num",      w:150},
+  {id:"prodType", name:"Production Type",  w:180, options:["Printing","Digital","Embroidery"]},
+  {id:"menuCode", name:"Menu Code",        w:150},
+];
+/* The three the rollout is usually read by. The rest are a click away
+   under "+ Add field". */
+let JOBFIELDS = ["desc","jobType","prodType"].map(id=>({...JOB_CATALOG.find(f=>f.id===id)}));
+let JOBFIELD = {};
+function reindexJobFields(){ JOBFIELD = Object.fromEntries(JOBFIELDS.map(f=>[f.id,f])); }
+reindexJobFields();
+
+/* Old Job Num only applies to a re-run or a pull-plate — the modal
+   collapses the field when Job Type is New Job, so the column greys out
+   on those rows rather than accepting a value that means nothing. */
+/* A checkbox field stores "Yes" or nothing, so it survives a copy to
+   TSV and back, and a pasted "true"/"1"/"x" still lands as checked. */
+const isOn = v => /^(yes|y|true|1|x|checked|on)$/i.test(String(v??"").trim());
+
+const JOB_TYPE_DEFAULT = "New Job";
+function oldJobApplies(vId){
+  const t = jobVal(vId, "jobType") || JOB_TYPE_DEFAULT;
+  return t !== JOB_TYPE_DEFAULT;
+}
+
+/* Job Description is stored on the version itself because everything
+   else refers to it; the rest live in a bag on the version. */
+function jobVal(vId, fId){
+  const v=VER(vId); if(!v) return "";
+  return fId==="desc" ? (v.desc||"") : ((v.fields&&v.fields[fId]) ?? "");
+}
+function setJobValue(vId, fId, raw){
+  const v=VER(vId); if(!v) return;
+  const val=String(raw).trim();
+  if(fId==="desc"){ v.desc=val; return; }
+  if(!v.fields) v.fields={};
+  if(val==="") delete v.fields[fId];
+  else v.fields[fId]=val;
+}
+
+/* ── Detail specs ──────────────────────────────────────────────
+   A master ticket is a job ticket, so its specs live on that ticket's
+   details, exactly as they do in job maintenance: each detail has its
+   own General / Paper / Print Finishing / Bindery sections. A detail is
+   one of the parts that go into the piece being shipped, so each detail
+   position gets its own table and a spec column belongs to exactly one
+   of them — the column no longer has to name its detail.
+
+   Details are added and removed on the job ticket itself, not here. The
+   rollout manager renders a table for each detail position its tickets
+   already have, and lists only the tickets that have it.
+   ------------------------------------------------------------- */
+const SPEC_CATALOG = {
+  "General":         ["Quantity","Number of Panels","Number of Sides","Size Desc","Menu Size","Insert Size"],
+  "Paper":           ["Size","Type","Weight","Color","Other"],
+  "Print Finishing": ["Lamination Thickness","Lamination Type","UV"],
+  "Bindery":         ["Corner Size","Clip Color","Binding Description"],
+};
+const specKey   = sp => sp.section+"|"+sp.field;
+const specLabel = sp => sp.section==="General" ? sp.field : sp.section+" "+sp.field;
+
+let SPECS = (window.ROLLOUT_DATA?.specs || []).map(sp=>({...sp}));
+
+const SPEC = id => SPECS.find(x=>x.id===id);
+const specsFor = d => SPECS.filter(sp=>sp.detail===d);
+
+/* Which detail positions exist anywhere in the rollout, and who has
+   each one. A position with no tickets on it has no table. */
+function detailCount(){
+  return state.versions.reduce((n,v)=>Math.max(n, v.details.length), 0);
+}
+function detailPositions(){
+  const out=[];
+  for(let i=0;i<detailCount();i++) if(versionsWithDetail(i).length) out.push(i);
+  return out;
+}
+function versionsWithDetail(d){ return state.versions.filter(v=>v.details[d]); }
+/* The name a detail position goes by, when every ticket agrees on one. */
+function detailName(d){
+  const names=[...new Set(versionsWithDetail(d).map(v=>v.details[d].name).filter(Boolean))];
+  return names.length===1 ? names[0] : "";
+}
+
+const PENCIL = `<button class="pencil" title="Rename" aria-label="Rename"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M8.3 1.2l2.5 2.5-6 6-3.1.6.6-3.1z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg></button>`;
+
+/* The drag affordance on a movable column header. Six dots, the usual
+   grip, held at a fixed width so hovering does not shift the label. */
+const GRIP = `<span class="grip" aria-hidden="true"><svg width="6" height="12" viewBox="0 0 6 12"><circle cx="1.5" cy="2" r="1"/><circle cx="4.5" cy="2" r="1"/><circle cx="1.5" cy="6" r="1"/><circle cx="4.5" cy="6" r="1"/><circle cx="1.5" cy="10" r="1"/><circle cx="4.5" cy="10" r="1"/></svg></span>`;
+
+/* Seed data lives in rollout-data.js — a real rollout, so the prototype
+   can be judged at the size the job actually is. */
+const SEED = window.ROLLOUT_DATA || {rollout:{}, versions:[], addresses:[], qtys:{}, addrValues:{}};
+
+let state = {
+  versions: JSON.parse(JSON.stringify(SEED.versions)),
+  addresses: JSON.parse(JSON.stringify(SEED.addresses)),
+
+  /* The distribution list itself: a quantity per version per address,
+     keyed "vId::aId". A quantity is also the membership record — an
+     address with no quantity for a version is not receiving it, so
+     there is no separate list of who gets what to keep in step. */
+  qtys: {...SEED.qtys},
+
+  /* Address-scoped values, keyed "aId::fId". */
+  addrValues: {...SEED.addrValues},
+
+  view:"master",
+};
+
+const nextId = (p, arr)=>{let n=1; const ids=new Set(arr.map(x=>x.id)); while(ids.has(p+n)) n++; return p+n;};
+const VER = id => state.versions.find(v=>v.id===id);
+const ADDR = id => state.addresses.find(a=>a.id===id);
+/* A version IS a job, so it goes by its six-digit job number everywhere;
+   the description is supporting detail. */
+const verName = v => (typeof v==="string" ? VER(v) : v).job;
+const verFull = v => { const x = typeof v==="string" ? VER(v) : v; return x.job + (x.desc?" · "+x.desc:""); };
+const nextJob = () => String(Math.max(204000, ...state.versions.map(v=>+v.job||0)) + 1);
+
+const qtyKey = (vId,aId) => vId+"::"+aId;
+const getQty = (vId,aId) => state.qtys[qtyKey(vId,aId)] ?? "";
+const addrVal = (aId,fId) => state.addrValues[aId+"::"+fId] ?? "";
+/* Receiving a version IS having a quantity for it. */
+const receives = (vId,aId) => String(getQty(vId,aId)).trim()!=="";
+const versionsFor = aId => state.versions.filter(v=>receives(v.id, aId));
+const addressesOn = vId => state.addresses.filter(a=>receives(vId, a.id));
+
+function setQty(vId, aId, raw){
+  const val=String(raw).trim();
+  if(val==="") delete state.qtys[qtyKey(vId,aId)];
+  else state.qtys[qtyKey(vId,aId)]=val;
+}
+function setAddrValue(aId, fId, raw){
+  const val=String(raw).trim();
+  if(val==="") delete state.addrValues[aId+"::"+fId];
+  else state.addrValues[aId+"::"+fId]=val;
+}
+
+/* What a version is printing: the sum of its addresses' quantities. */
+function versionTotal(vId){
+  return state.addresses.reduce((n,a)=>{
+    const v = parseFloat(String(getQty(vId, a.id)).replace(/[^0-9.\-]/g,""));
+    return n + (isNaN(v) ? 0 : v);
+  }, 0);
+}
+
+/* ============================ HISTORY ============================ */
+const snap = ()=>JSON.stringify({v:state.versions,a:state.addresses,
+  q:state.qtys,av:state.addrValues,f:FIELDS,jf:JOBFIELDS,s:SPECS});
+let past=[], future=[], pending=null;
+function begin(){ pending = snap(); }
+function commit(){
+  if(pending==null) return;
+  if(pending!==snap()){ past.push(pending); if(past.length>80) past.shift(); future=[]; }
+  pending=null; render();
+}
+function restore(js){
+  const o=JSON.parse(js);
+  state.versions=o.v; state.addresses=o.a; state.qtys=o.q; state.addrValues=o.av;
+  FIELDS=o.f; reindexFields();
+  JOBFIELDS=o.jf||JOBFIELDS; reindexJobFields();
+  SPECS=o.s;
+}
+function undo(){ if(!past.length) return; const cur=snap(); restore(past.pop()); future.push(cur); sel=null; render(); }
+function redo(){ if(!future.length) return; const cur=snap(); restore(future.pop()); past.push(cur); sel=null; render(); }
+
+/* ============================ GRID MODEL ============================ */
+/* A view compiles to a LIST of tables, each {id, kind, title, sub, note,
+   rowHead, rows, cols, cellAt}. Rows and cols carry a `kind` so the
+   renderer knows what it is drawing, `movable` to make a header a drag
+   handle, and `pinned` to keep a column where it is.
+
+     master view → the master tickets table, then one table per detail
+                   position. Adding and removing tickets, and the job
+                   header fields, happen on the first table; everything
+                   about a part happens on that part's table.
+     dist view   → the distribution list, one table.
+   ------------------------------------------------------------------ */
+
+function masterTable(){
+  return {
+    id:"master", kind:"master",
+    title:"Master tickets",
+    sub:`${state.versions.length} ticket${state.versions.length===1?"":"s"} in this rollout`,
+    rowHead:"Master Ticket",
+    rows: state.versions.map(v=>({key:v.id, kind:"version", label:v.job}))
+           .concat([{key:"__add", kind:"addrow", label:"+ Add Master Ticket"}]),
+    /* Quantity first, as a read-only roll-up of the distribution list.
+       It is pinned: it is what the rest of the row is read against, so
+       nothing moves in front of it. */
+    cols: [{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true}]
+           .concat(JOBFIELDS.map(f=>({key:f.id, kind:"jobfield", label:f.name, num:f.num,
+                     w:f.w||180, movable:true, options:f.options, bool:f.bool})))
+           .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
+    cellAt(rk, ck){
+      if(rk==="__add"||ck==="__addfield") return {kind:"blank"};
+      if(ck==="__qtytotal"){
+        const total = versionTotal(rk);
+        return {kind:"data", value:String(total), display:total.toLocaleString(),
+                num:true, editable:false, derived:true};
+      }
+      if(ck==="oldJob" && !oldJobApplies(rk)){
+        return {kind:"data", value:"", display:"n/a", editable:false, na:true};
+      }
+      const f = JOBFIELD[ck] || {};
+      const val = jobVal(rk, ck);
+      if(f.bool) return {kind:"data", value:val, display:val, editable:true,
+                         bool:true, checked:isOn(val)};
+      return {kind:"data", value:val, display:val, editable:true, options:f.options};
+    }
+  };
+}
+
+function detailTable(d){
+  const vs = versionsWithDetail(d);
+  const nm = detailName(d);
+  return {
+    id:"d"+d, kind:"detail", detail:d,
+    title:`Detail ${d+1}${nm?" · "+nm:""}`,
+    sub:`${vs.length} of ${state.versions.length} master ticket${state.versions.length===1?"":"s"}`,
+    rowHead:"Master Ticket",
+    rows: vs.map(v=>({key:v.id, kind:"version", label:v.job})),
+    /* The two identifying columns are read-only context carried over
+       from the master ticket, so they are pinned and not selectable —
+       there is nothing on them to edit, copy or clear. Detail
+       Description is this ticket's own name for the part, so it IS
+       editable, but it stays pinned in front of the specs. */
+    cols: [{key:"__jobdesc",    kind:"context",    label:"Job Description",    w:230, pinned:true},
+           {key:"__detailname", kind:"detailname", label:"Detail Description", w:180, pinned:true}]
+          .concat(specsFor(d).map(sp=>({key:sp.id, kind:"spec", label:specLabel(sp),
+                    w:180, movable:true})))
+          .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
+    cellAt(rk, ck){
+      if(ck==="__addfield") return {kind:"blank"};
+      const v=VER(rk), det=v && v.details[d];
+      if(!det) return {kind:"blank"};
+      if(ck==="__jobdesc"){
+        return {kind:"data", value:v.desc||"", display:v.desc||"", editable:false, context:true};
+      }
+      if(ck==="__detailname"){
+        return {kind:"data", value:det.name||"", display:det.name||"", editable:true};
+      }
+      const sp=SPEC(ck);
+      const val = sp ? (det.specs[specKey(sp)] ?? "") : "";
+      return {kind:"data", value:val, display:val, editable:true};
+    }
+  };
+}
+
+function distTable(){
+  return {
+    id:"dist", kind:"dist",
+    title:"Distribution list",
+    sub:`${state.addresses.length} address${state.addresses.length===1?"":"es"}`,
+    rowHead:"Address",
+    rows: state.addresses.map(a=>({key:a.id, kind:"address", label:a.name,
+             sub:[a.code, a.city].filter(Boolean).join(" · ")}))
+          .concat([{key:"__add", kind:"addrow", label:"+ New address"}]),
+    /* Quantity columns are pinned. They are the distribution list
+       itself — the membership record — so they keep their order under
+       the Quantity group header and no shipping field can be dropped in
+       front of them. */
+    /* A quantity column is headed by what the version IS, not its job
+       number — the numbers underneath are what the column is read for,
+       and the job number is one hover away in the title. */
+    cols: state.versions.map(v=>({key:"q:"+v.id, kind:"qty", version:v.id,
+              group:"Quantity", label:v.desc || v.job, num:true, w:120, pinned:true}))
+          .concat(FIELDS.map(f=>({key:f.id, kind:"field", label:f.name, num:f.num,
+              w:f.id==="notes"?230:160, movable:true})))
+          .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
+    cellAt(rk, ck){
+      if(rk==="__add"||ck==="__addfield") return {kind:"blank"};
+      if(ck.startsWith("q:")){
+        const val=getQty(ck.slice(2), rk);
+        return {kind:"data", value:val, display:val, num:true, editable:true, qty:true};
+      }
+      const val=addrVal(rk, ck);
+      return {kind:"data", value:val, display:val, num:FIELD[ck].num, editable:true};
+    }
+  };
+}
+
+function model(){
+  return state.view==="master"
+    ? [masterTable()].concat(detailPositions().map(detailTable))
+    : [distTable()];
+}
+
+/* ============================ SELECTION ============================ */
+/* Selection belongs to one table: {t, r0,c0,r1,c1} where t indexes M.
+   A range never spans two tables. */
+let sel=null;
+let editing=null;        // {t,r,c,seed}
+let M=model();
+
+const TM = t => M[t] || null;
+const norm = s => s && {t:s.t, r0:Math.min(s.r0,s.r1), r1:Math.max(s.r0,s.r1),
+                        c0:Math.min(s.c0,s.c1), c1:Math.max(s.c0,s.c1)};
+
+/* A derived or context column is read-only chrome, so its cells are not
+   selectable at all — nothing to edit, copy out of or clear. */
+const colSelectable = (t,c)=>{
+  const T=TM(t); const C=T&&T.cols[c];
+  return !!C && C.kind!=="addcol" && C.kind!=="derived" && C.kind!=="context";
+};
+const selectable = (t,r,c)=>{
+  const T=TM(t); const R=T&&T.rows[r];
+  return !!R && R.kind!=="addrow" && colSelectable(t,c);
+};
+
+function setSel(t,r,c,extend){
+  if(!selectable(t,r,c)) return;
+  if(extend && sel && sel.t===t){ sel.r1=r; sel.c1=c; }
+  else sel={t,r0:r,c0:c,r1:r,c1:c};
+  render();
+}
+function moveSel(dr,dc,extend){
+  if(!sel) return;
+  const t=sel.t, T=TM(t); if(!T) return;
+  let r=Math.max(0,Math.min(T.rows.length-1, (extend?sel.r1:sel.r0)+dr));
+  let c=Math.max(0,Math.min(T.cols.length-1, (extend?sel.c1:sel.c0)+dc));
+  let guard=0;
+  while(!selectable(t,r,c) && guard++<200){
+    if(dr>0&&r>0) r--; else if(dr<0&&r<T.rows.length-1) r++;
+    else if(dc>0&&c>0) c--; else if(dc<0&&c<T.cols.length-1) c++;
+    else return;
+  }
+  if(!selectable(t,r,c)) return;
+  setSel(t,r,c,extend);
+  const el=cellEl(t,r,c);
+  el && el.scrollIntoView({block:"nearest", inline:"nearest"});
+}
+function clampSel(){
+  if(!sel) return;
+  const s=norm(sel), T=TM(s.t);
+  if(!T){ sel=null; return; }
+  let {r0,r1,c0,c1}=s;
+  r1=Math.min(r1, T.rows.length-1); r0=Math.min(r0, r1);
+  c1=Math.min(c1, T.cols.length-1); c0=Math.min(c0, c1);
+  while(r1>r0 && T.rows[r1].kind==="addrow") r1--;
+  while(c1>c0 && !colSelectable(s.t,c1)) c1--;
+  while(c0<c1 && !colSelectable(s.t,c0)) c0++;
+  sel={t:s.t,r0,c0,r1,c1};
+  if(!selectable(s.t,r0,c0)) sel=null;
+}
+
+/* ============================ RENDER ============================ */
+const viewhost = document.getElementById("viewhost");
+const cellEl = (t,r,c)=>document.querySelector(`td[data-t="${t}"][data-r="${r}"][data-c="${c}"]`);
+
+function render(){
+  M = model();
+  if(sel) clampSel();
+  renderChrome();
+  renderTables();
+}
+
+/* Rollout identity, from the data file. */
+(function(){
+  const r=(window.ROLLOUT_DATA&&window.ROLLOUT_DATA.rollout)||{};
+  const label=[r.customer, r.name].filter(Boolean).join(" · ");
+  const n=document.getElementById("rolloutName"), c=document.getElementById("rolloutCrumb");
+  if(n) n.textContent = label ? "/ "+label : "";
+  if(c) c.textContent = r.name || "Rollout";
+})();
+
+function setTab(btn, on){
+  btn.classList.toggle("active", on);
+  btn.setAttribute("aria-pressed", on);
+}
+function renderChrome(){
+  setTab(document.getElementById("tabMaster"), state.view==="master");
+  setTab(document.getElementById("tabDist"),   state.view==="dist");
+}
+
+/* Each table gets its own <section> from the template in the markup —
+   heading, then a scroller holding the table. The master view stacks
+   several; the distribution list is one, and fills the height. */
+function renderTables(){
+  viewhost.className = "viewhost " + (M.length>1 ? "viewhost--stack" : "viewhost--single");
+  viewhost.innerHTML = "";
+  M.forEach((T,t)=>{
+    const sec = document.getElementById("tableSectionTemplate").content.firstElementChild.cloneNode(true);
+    sec.dataset.table = T.id;
+    sec.querySelector(".grid-section__title").textContent = T.title;
+    const sub = sec.querySelector(".grid-section__sub");
+    if(T.sub) sub.textContent = T.sub; else sub.remove();
+    sec.querySelector(".grid-host").appendChild(buildTable(T,t));
+    viewhost.appendChild(sec);
+  });
+  if(editing) mountEditor();
+}
+
+function buildTable(T,t){
+  const tbl=document.createElement("table");
+  const colg=document.createElement("colgroup");
+  colg.innerHTML = `<col style="width:${T.kind==="dist"?"var(--rm-rowhead-width-dist)":"var(--rm-rowhead-width)"}">` +
+    T.cols.map(c=>`<col style="width:${c.w||150}px">`).join("");
+  tbl.appendChild(colg);
+
+  /* Head. Columns may declare a `group`; consecutive columns sharing one
+     get a spanning header above them and their own label below, so the
+     quantity columns stay as narrow as the numbers in them. Ungrouped
+     columns span both rows. */
+  const thead=document.createElement("thead");
+  const grouped = T.cols.some(c=>c.group);
+  const hr=document.createElement("tr");
+  const hr2=grouped ? document.createElement("tr") : null;
+
+  const corner=document.createElement("th");
+  corner.innerHTML=`<span class="cellpad">${esc(T.rowHead)}</span>`;
+  if(grouped) corner.rowSpan=2;
+  hr.appendChild(corner);
+
+  function headerCell(c, ci){
+    const th=document.createElement("th");
+    if(c.kind==="addcol"){
+      th.className="add"; th.innerHTML=`<span class="cellpad">${esc(c.label)}</span>`;
+      th.onclick=e=>addColumnMenu(T, e.currentTarget);
+      return th;
+    }
+    const s=sel&&norm(sel);
+    th.className="hd" + (c.kind==="qty" ? " hd-qty":"") +
+      (c.movable ? " hd-move" : " hd-pinned") +
+      (s&&s.t===t&&ci>=s.c0&&ci<=s.c1 ? " hd-sel":"");
+    th.dataset.col=ci;
+    if(c.kind==="qty") th.title = "Job "+VER(c.version).job+(VER(c.version).desc?" · "+VER(c.version).desc:"");
+    else if(c.group && c.sub) th.title = c.label+" · "+c.sub;
+    th.innerHTML = c.group
+      ? `<span class="cellpad cellpad--stack"><span class="hd-label">${esc(c.label)}</span>${
+          c.sub?`<span class="sub">${esc(c.sub)}</span>`:""}</span>`
+      : `<span class="cellpad">${c.movable?GRIP:""}<span class="hd-label">${esc(c.label)}${
+          c.sub?`<span class="sub"> · ${esc(c.sub)}</span>`:""}</span></span>`;
+    if(c.movable) wireColumnDrag(th, T, c);
+    else if(!th.title) th.title = c.label + " — fixed column";
+    if(c.kind==="spec")     th.oncontextmenu=e=>{e.preventDefault(); specMenu(e, c.key);};
+    if(c.kind==="field")    th.oncontextmenu=e=>{e.preventDefault(); fieldMenu(e, c.key);};
+    if(c.kind==="jobfield") th.oncontextmenu=e=>{e.preventDefault(); jobFieldMenu(e, c.key);};
+    if(c.kind==="qty")      th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e, c.version);};
+    return th;
+  }
+
+  for(let ci=0; ci<T.cols.length; ci++){
+    const c=T.cols[ci];
+    if(grouped && c.group){
+      let span=1;
+      while(ci+span<T.cols.length && T.cols[ci+span].group===c.group) span++;
+      const gth=document.createElement("th");
+      gth.className="hd-group";
+      gth.colSpan=span;
+      gth.innerHTML=`<span class="cellpad">${esc(c.group)}</span>`;
+      hr.appendChild(gth);
+      for(let k=0;k<span;k++) hr2.appendChild(headerCell(T.cols[ci+k], ci+k));
+      ci += span-1;
+      continue;
+    }
+    const th=headerCell(c, ci);
+    if(grouped) th.rowSpan=2;
+    hr.appendChild(th);
+  }
+  thead.appendChild(hr);
+  if(grouped) thead.appendChild(hr2);
+  tbl.appendChild(thead);
+
+  // body
+  const tbody=document.createElement("tbody");
+  const s=sel&&norm(sel);
+  T.rows.forEach((R,ri)=>{
+    const tr=document.createElement("tr");
+    const th=document.createElement("th");
+    if(R.kind==="addrow"){
+      th.className="add"; th.innerHTML=`<span class="cellpad">${esc(R.label)}</span>`;
+      th.onclick=()=> T.kind==="master" ? addVersion() : newAddress();
+    } else {
+      th.className="hd" + (s&&s.t===t&&ri>=s.r0&&ri<=s.r1 ? " hd-sel":"");
+      const sub = R.sub || "";
+      /* Renaming happens where the thing is owned: a job number on the
+         master tickets table, an address on the distribution list. The
+         detail tables carry the job number as read-only context. */
+      const own = T.kind==="master" ? R.kind==="version" : R.kind==="address";
+      th.innerHTML=`<span class="cellpad"><span class="hd-label">${esc(R.label)}${
+        sub?`<span class="sub"> · ${esc(sub)}</span>`:""}</span>${own?PENCIL:""}</span>`;
+      th.onclick=()=>{ sel={t,r0:ri,c0:0,r1:ri,c1:T.cols.length-1}; clampSel(); render(); };
+      if(R.kind==="version" && T.kind==="master"){
+        th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e,R.key);};
+        wirePencil(th, ()=>VER(R.key).job, n=>VER(R.key).job=n);
+      }
+      if(R.kind==="address"){
+        th.oncontextmenu=e=>{e.preventDefault(); addressMenu(e, R.key);};
+        wirePencil(th, ()=>ADDR(R.key).name, n=>ADDR(R.key).name=n);
+      }
+    }
+    tr.appendChild(th);
+
+    T.cols.forEach((C,ci)=>{
+      const td=document.createElement("td");
+      td.dataset.t=t; td.dataset.r=ri; td.dataset.c=ci;
+      const cell=T.cellAt(R.key,C.key);
+
+      if(cell.kind==="blank"){ td.className="blank"; tr.appendChild(td); return; }
+
+      const cls=["cell"];
+      if(cell.derived) cls.push("derived");
+      if(cell.context) cls.push("context");
+      if(cell.na) cls.push("na");
+      if(cell.qty) cls.push("qty");
+      if(cell.num) cls.push("num");
+      if(!String(cell.display||"").length) cls.push("empty");
+      if(cell.bool) cls.push("bool");
+      td.className=cls.join(" ");
+      /* A checkbox cell renders the control itself — there is nothing to
+         type into it, so it has no editor. */
+      td.innerHTML = cell.bool
+        ? `<span class="val"><input type="checkbox" class="cell-check"${cell.checked?" checked":""} aria-label="${esc(C.label)}"></span>`
+        : `<span class="val">${esc(cell.display||"")}</span>`;
+      applySel(td,t,ri,ci);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  return tbl;
+}
+
+function applySel(td,t,ri,ci){
+  if(!sel) return;
+  const s=norm(sel);
+  if(s.t!==t || ri<s.r0||ri>s.r1||ci<s.c0||ci>s.c1) return;
+  td.classList.add("sel");
+  if(ri===sel.r0&&ci===sel.c0) td.classList.add("anchor");
+  if(ri===s.r0) td.classList.add("e-t");
+  if(ri===s.r1) td.classList.add("e-b");
+  if(ci===s.c0) td.classList.add("e-l");
+  if(ci===s.c1) td.classList.add("e-r");
+  if(ri===s.r1&&ci===s.c1 && !editing){
+    const h=document.createElement("div"); h.className="handle"; h.dataset.handle="1";
+    td.appendChild(h);
+  }
+}
+
+/* ── Column reordering ─────────────────────────────────────────
+   A movable column header IS the drag handle — there is no separate
+   grabber element, and clicking a header does nothing else. Only
+   movable headers are drop targets, which is what keeps the pinned
+   columns first: there is no gap in front of them to drop into, and a
+   column cannot be dragged out of its own table. Order lives in
+   JOBFIELDS / SPECS / FIELDS, so a move is a splice on that array and
+   undo/redo covers it for free.
+   ------------------------------------------------------------- */
+let dragCol=null;   // {table:T, key}
+
+function clearDropMarks(){
+  document.querySelectorAll("th.drop-before, th.drop-after")
+    .forEach(x=>x.classList.remove("drop-before","drop-after"));
+}
+
+function wireColumnDrag(th, T, c){
+  th.draggable = true;
+  th.dataset.colkey = c.key;
+  th.title = c.label + " — drag to reorder";
+
+  th.ondragstart = e=>{
+    dragCol = {table:T, key:c.key};
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", c.key);
+    th.classList.add("is-dragging");
+  };
+  th.ondragend = ()=>{ dragCol=null; clearDropMarks(); render(); };
+  th.ondragover = e=>{
+    if(!dragCol || dragCol.table!==T || dragCol.key===c.key) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const r = th.getBoundingClientRect();
+    const before = (e.clientX - r.left) < r.width/2;
+    clearDropMarks();
+    th.classList.add(before ? "drop-before" : "drop-after");
+  };
+  th.ondragleave = ()=> th.classList.remove("drop-before","drop-after");
+  th.ondrop = e=>{
+    if(!dragCol || dragCol.table!==T) return;
+    e.preventDefault();
+    const before = th.classList.contains("drop-before");
+    clearDropMarks();
+    moveColumn(T, dragCol.key, c.key, before);
+    dragCol = null;
+  };
+}
+
+/* Which array holds a table's movable columns, and what a column is
+   called in a toast. */
+function orderList(T){
+  return T.kind==="master" ? JOBFIELDS : T.kind==="dist" ? FIELDS : SPECS;
+}
+const colName = x => x.name || specLabel(x);
+
+function moveColumn(T, fromKey, toKey, before){
+  if(!fromKey || fromKey===toKey) return;
+  const list = orderList(T);
+  const from = list.findIndex(x=>x.id===fromKey);
+  if(from<0 || !list.some(x=>x.id===toKey)) return;
+  begin();
+  const [item] = list.splice(from,1);
+  const to = list.findIndex(x=>x.id===toKey);
+  list.splice(before ? to : to+1, 0, item);
+  if(T.kind==="dist") reindexFields();
+  if(T.kind==="master") reindexJobFields();
+  sel=null;
+  commit();
+  toast(`${colName(item)} moved.`, "Undo", undo);
+}
+
+/* ============================ EDITING ============================ */
+function startEdit(t,r,c,seed){
+  const T=TM(t); if(!T) return;
+  const R=T.rows[r], C=T.cols[c];
+  if(!R||!C) return;
+  const cell=T.cellAt(R.key,C.key);
+  if(cell.kind!=="data" || !cell.editable){
+    if(cell.derived) toast("This is the total of its addresses' quantities.", "Open distribution list", ()=>{
+      state.view="dist"; sel=null; render();
+    });
+    else if(cell.context) toast("Set on the master ticket.", "Open master tickets", ()=>{
+      state.view="master"; sel=null; render();
+    });
+    else if(cell.na) toast("Old Job Num applies to a re-run or a pull-plate. Set Job Type first.");
+    return;
+  }
+  if(cell.bool){ toggleBool(t,r,c); return; }
+  editing={t,r,c,seed};
+  render();
+}
+
+/* Toggling is a whole edit of its own — one begin/commit, so undo takes
+   it back in one step. */
+function toggleBool(t,r,c,force){
+  const T=TM(t); if(!T) return;
+  const cell=T.cellAt(T.rows[r].key, T.cols[c].key);
+  if(!cell.bool || !cell.editable) return;
+  const next = (force==null ? !cell.checked : !!force) ? "Yes" : "";
+  begin(); applyValue(t,r,c,next); commit();
+}
+function mountEditor(){
+  const td=cellEl(editing.t, editing.r, editing.c);
+  if(!td){ editing=null; return; }
+  const T=TM(editing.t);
+  const R=T.rows[editing.r], C=T.cols[editing.c];
+  const cell=T.cellAt(R.key,C.key);
+  /* A field with a fixed set of values is still typed into — it
+     completes as you type, lists what matches, and refuses anything that
+     is not on the list. Not a dropdown: these are fields people already
+     know the values of, and typing three characters beats picking. */
+  const opts = cell.options;
+  const inp=document.createElement("input");
+  inp.className="editor";
+  inp.value = editing.seed!=null ? editing.seed : (cell.value||"");
+  td.appendChild(inp);
+  inp.focus();
+  if(editing.seed!=null) inp.setSelectionRange(inp.value.length,inp.value.length); else inp.select();
+
+  const ac = opts ? autocomplete(inp, td, opts) : null;
+  if(ac && editing.seed!=null) ac.complete();
+
+  const finish=(save, move)=>{
+    let val=inp.value;
+    if(save && opts){
+      const m=matchOption(opts, val);
+      if(val.trim()!=="" && !m){
+        /* Refused: the cell keeps what it had. */
+        ac && ac.close();
+        editing=null; render();
+        toast(`"${val.trim()}" is not a ${C.label.toLowerCase()}. Choose one of: ${opts.join(", ")}.`);
+        return;
+      }
+      val = m || "";
+    }
+    const at={t:editing.t,r:editing.r,c:editing.c};
+    ac && ac.close();
+    editing=null;
+    if(save){ begin(); applyValue(at.t,at.r,at.c,val); commit(); } else render();
+    if(move){ sel={t:at.t,r0:at.r,c0:at.c,r1:at.r,c1:at.c}; moveSel(move[0],move[1],false); }
+  };
+  inp.onblur=()=>{ if(editing) finish(true,null); };
+  inp.onkeydown=e=>{
+    e.stopPropagation();
+    if(ac && ac.onkeydown(e)) return;
+    if(e.key==="Enter"){ e.preventDefault(); finish(true,[1,0]); }
+    else if(e.key==="Escape"){ e.preventDefault(); finish(false,null); }
+    else if(e.key==="Tab"){ e.preventDefault(); finish(true,[0,e.shiftKey?-1:1]); }
+  };
+  if(ac) ac.onpick = ()=> finish(true,[1,0]);
+}
+/* ── Type-ahead ────────────────────────────────────────────────
+   Attached to the cell editor when the column has a fixed set of
+   values. It completes the rest of the first match inline and leaves it
+   selected, so typing "re" gives "Re-run with Changes" with "-run with
+   Changes" highlighted — carry on typing and it recomputes, press
+   Delete and you keep just what you typed. The matches are listed under
+   the cell; arrow keys walk them. Nothing off the list can be saved —
+   finish() refuses it.
+   ------------------------------------------------------------- */
+const matchOption = (opts, val)=>{
+  const v=String(val??"").trim().toLowerCase();
+  return opts.find(o=>o.toLowerCase()===v) || null;
+};
+
+function autocomplete(inp, td, opts){
+  /* The list is on <body> because a cell clips its own overflow. */
+  const list=document.createElement("div");
+  list.className="ac";
+  document.body.appendChild(list);
+  /* `query` is what was TYPED. Walking the list writes a whole value
+     into the input, and filtering on that would collapse the list to
+     the one item just landed on — so the filter always reads the
+     query, never the input. */
+  let items=[], active=-1, query=inp.value, api;
+
+  const starts = v => opts.filter(o=>o.toLowerCase().startsWith(v.toLowerCase()));
+  const holds  = v => opts.filter(o=>o.toLowerCase().includes(v.toLowerCase()));
+
+  function place(){
+    const r=td.getBoundingClientRect();
+    list.style.left=r.left+"px";
+    list.style.top=r.bottom+"px";
+    list.style.minWidth=r.width+"px";
+  }
+  function paint(){
+    const v=query.trim();
+    items = v==="" ? opts.slice() : (starts(v).length ? starts(v) : holds(v));
+    list.innerHTML="";
+    items.forEach((o,i)=>{
+      const b=document.createElement("button");
+      b.type="button"; b.textContent=o;
+      b.className = i===active ? "is-active" : "";
+      b.onmousedown=e=>{ e.preventDefault(); inp.value=o; query=o; api.close(); api.onpick&&api.onpick(); };
+      list.appendChild(b);
+    });
+    list.classList.toggle("open", items.length>0);
+    inp.classList.toggle("editor--invalid", v!=="" && items.length===0);
+    place();
+  }
+  /* Inline completion: only when adding characters, never when deleting,
+     or a value can never be shortened. */
+  function complete(){
+    const v=query;
+    if(!v) return;
+    const hit=starts(v)[0];
+    if(hit && hit.length>v.length){
+      inp.value=hit;
+      inp.setSelectionRange(v.length, hit.length);
+    }
+  }
+  function move(d){
+    if(!items.length) return;
+    active = (active + d + items.length) % items.length;
+    inp.value = items[active];
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+    paint();
+  }
+
+  inp.addEventListener("input", e=>{
+    active=-1;
+    query=inp.value;
+    if(!/^delete/i.test(e.inputType||"")) complete();
+    paint();
+  });
+  paint();
+
+  api = {
+    complete(){ complete(); paint(); },
+    close(){ list.remove(); },
+    onpick:null,
+    onkeydown(e){
+      if(e.key==="ArrowDown"){ e.preventDefault(); move(1); return true; }
+      if(e.key==="ArrowUp"){   e.preventDefault(); move(-1); return true; }
+      return false;
+    }
+  };
+  return api;
+}
+
+function applyValue(t,r,c,val){
+  const T=TM(t); if(!T) return;
+  const R=T.rows[r], C=T.cols[c];
+  if(!R||!C) return;
+  if(T.kind==="master"){
+    if(C.kind!=="jobfield") return;
+    /* A pasted or filled "true"/"1"/"x" lands as checked; anything else
+       clears it. */
+    setJobValue(R.key, C.key, C.bool ? (isOn(val) ? "Yes" : "") : val);
+  } else if(T.kind==="detail"){
+    const det=VER(R.key) && VER(R.key).details[T.detail];
+    if(!det) return;
+    if(C.kind==="detailname"){ det.name=String(val).trim(); return; }
+    const sp=SPEC(C.key); if(!sp) return;
+    det.specs[specKey(sp)]=String(val).trim();
+  } else if(C.kind==="qty"){
+    setQty(C.version, R.key, val);
+  } else if(C.kind==="field"){
+    setAddrValue(R.key, C.key, val);
+  }
+}
+function clearRange(){
+  if(!sel) return;
+  const s=norm(sel), T=TM(s.t); if(!T) return;
+  let touched=0;
+  begin();
+  for(let r=s.r0;r<=s.r1;r++) for(let c=s.c0;c<=s.c1;c++){
+    if(!selectable(s.t,r,c)) continue;
+    const cell=T.cellAt(T.rows[r].key, T.cols[c].key);
+    if(cell.kind!=="data" || !cell.editable) continue;
+    applyValue(s.t,r,c,""); touched++;
+  }
+  commit();
+  if(touched) toast(`Cleared ${touched} cell${touched===1?"":"s"}.`, "Undo", undo);
+}
+
+/* ---------- fill ---------- */
+let fill=null;
+function beginFill(e){
+  if(!sel) return;
+  const s=norm(sel);
+  fill={t:s.t, src:s, r1:s.r1, c1:s.c1};
+  e.preventDefault();
+}
+function fillPreview(t,r,c){
+  if(t!==fill.t) return;
+  const s=fill.src, T=TM(fill.t);
+  const vert = Math.abs(r-s.r1) >= Math.abs(c-s.c1);
+  fill.r1 = vert ? Math.max(s.r1, Math.min(r, T.rows.length-1)) : s.r1;
+  fill.c1 = vert ? s.c1 : Math.max(s.c1, Math.min(c, T.cols.length-1));
+  document.querySelectorAll("td.fillpreview").forEach(x=>x.classList.remove("fillpreview"));
+  for(let rr=s.r0; rr<=fill.r1; rr++) for(let cc=s.c0; cc<=fill.c1; cc++){
+    if(rr<=s.r1 && cc<=s.c1) continue;
+    const td=cellEl(fill.t,rr,cc);
+    td && td.classList.add("fillpreview");
+  }
+}
+function endFill(){
+  if(!fill) return;
+  const t=fill.t, s=fill.src, {r1,c1}=fill; fill=null;
+  document.querySelectorAll("td.fillpreview").forEach(x=>x.classList.remove("fillpreview"));
+  if(r1===s.r1 && c1===s.c1) return;
+  const T=TM(t); if(!T) return;
+  const h=s.r1-s.r0+1, w=s.c1-s.c0+1; let n=0;
+  begin();
+  for(let rr=s.r0; rr<=r1; rr++) for(let cc=s.c0; cc<=c1; cc++){
+    if(rr<=s.r1 && cc<=s.c1) continue;
+    if(!selectable(t,rr,cc)) continue;
+    const src=T.cellAt(T.rows[s.r0+((rr-s.r0)%h)].key, T.cols[s.c0+((cc-s.c0)%w)].key);
+    const tgt=T.cellAt(T.rows[rr].key, T.cols[cc].key);
+    if(tgt.kind!=="data"||!tgt.editable) continue;
+    applyValue(t,rr,cc, src.value ?? ""); n++;
+  }
+  commit();
+  sel={t,r0:s.r0,c0:s.c0,r1:r1,c1:c1}; clampSel(); render();
+  if(n) toast(`Filled ${n} cell${n===1?"":"s"}.`, "Undo", undo);
+}
+
+/* ---------- copy / paste ---------- */
+function selTSV(){
+  if(!sel) return "";
+  const s=norm(sel), T=TM(s.t); if(!T) return "";
+  const out=[];
+  for(let r=s.r0;r<=s.r1;r++){
+    const row=[];
+    for(let c=s.c0;c<=s.c1;c++){
+      const R=T.rows[r],C=T.cols[c];
+      const cell=(R&&C)?T.cellAt(R.key,C.key):null;
+      row.push(cell&&cell.kind==="data" ? (cell.value??"") : "");
+    }
+    out.push(row.join("\t"));
+  }
+  return out.join("\n");
+}
+document.addEventListener("copy", e=>{
+  if(editing || !sel) return;
+  e.clipboardData.setData("text/plain", selTSV());
+  e.preventDefault();
+  toast("Copied.");
+});
+document.addEventListener("paste", e=>{
+  if(editing || !sel) return;
+  const txt=(e.clipboardData||window.clipboardData).getData("text/plain");
+  if(!txt) return;
+  e.preventDefault();
+  const grid=txt.replace(/\r/g,"").replace(/\n$/,"").split("\n").map(l=>l.split("\t"));
+  const s=norm(sel), t=s.t, T=TM(t); if(!T) return;
+  let n=0, skipped=0;
+  begin();
+  for(let i=0;i<grid.length;i++) for(let j=0;j<grid[i].length;j++){
+    const r=s.r0+i, c=s.c0+j;
+    if(!selectable(t,r,c)) continue;
+    const tgt=T.cellAt(T.rows[r].key, T.cols[c].key);
+    if(tgt.kind!=="data"){ continue; }
+    if(!tgt.editable){ skipped++; continue; }
+    applyValue(t,r,c,grid[i][j]); n++;
+  }
+  commit();
+  sel={t,r0:s.r0,c0:s.c0,r1:Math.min(s.r0+grid.length-1,T.rows.length-1),
+       c1:Math.min(s.c0+Math.max(...grid.map(g=>g.length))-1,T.cols.length-1)};
+  clampSel(); render();
+  toast(`Pasted ${n} cell${n===1?"":"s"}.` + (skipped?` ${skipped} skipped — read-only.`:""), "Undo", undo);
+});
+
+/* ============================ MOUSE ============================ */
+let dragging=false;
+viewhost.addEventListener("mousedown", e=>{
+  if(e.target.dataset.handle){ beginFill(e); return; }
+  const td=e.target.closest("td[data-r]");
+  if(!td) return;
+  const t=+td.dataset.t, r=+td.dataset.r, c=+td.dataset.c;
+  /* The checkbox is the control — clicking it toggles, and takes the
+     selection with it so the keyboard carries on from there. */
+  if(e.target.classList.contains("cell-check")){
+    e.preventDefault();
+    if(selectable(t,r,c)) setSel(t,r,c,false);
+    toggleBool(t,r,c);
+    return;
+  }
+  /* Double-click opens the editor. It is read off mousedown rather than
+     a dblclick listener because the first click re-renders the table,
+     which detaches the <td> the dblclick would have been delivered to.
+     A read-only cell gets here too, so that startEdit() can say where
+     its value is set instead. */
+  if(e.detail>=2){
+    e.preventDefault();
+    if(editing){ const inp=document.querySelector(".editor"); inp&&inp.blur(); }
+    if(selectable(t,r,c)) setSel(t,r,c,false);
+    startEdit(t,r,c,null);
+    return;
+  }
+  if(!selectable(t,r,c)) return;
+  if(e.button===2) { // right-click keeps existing selection if inside
+    const s=sel&&norm(sel);
+    if(!(s&&s.t===t&&r>=s.r0&&r<=s.r1&&c>=s.c0&&c<=s.c1)) setSel(t,r,c,false);
+    return;
+  }
+  if(editing) { const inp=document.querySelector(".editor"); inp&&inp.blur(); }
+  setSel(t,r,c,e.shiftKey);
+  dragging=true;
+  e.preventDefault();
+});
+document.addEventListener("mousemove", e=>{
+  const td=e.target.closest && e.target.closest("td[data-r]");
+  if(fill){ if(td) fillPreview(+td.dataset.t, +td.dataset.r, +td.dataset.c); return; }
+  if(!dragging||!td) return;
+  const t=+td.dataset.t, r=+td.dataset.r, c=+td.dataset.c;
+  /* A range lives in one table, so a drag that wanders into another is
+     ignored rather than jumping. */
+  if(!sel || t!==sel.t || !selectable(t,r,c)) return;
+  if(sel.r1!==r||sel.c1!==c){ sel.r1=r; sel.c1=c; render(); }
+});
+document.addEventListener("mouseup", ()=>{ dragging=false; if(fill) endFill(); });
+viewhost.addEventListener("contextmenu", e=>{
+  const td=e.target.closest("td[data-r]"); if(!td) return;
+  e.preventDefault();
+  /* No menu on a cell that cannot be selected — nothing on it to copy
+     or clear. */
+  if(!selectable(+td.dataset.t, +td.dataset.r, +td.dataset.c) || !sel) return;
+  cellMenu(e);
+});
+
+/* ============================ KEYBOARD ============================ */
+document.addEventListener("keydown", e=>{
+  if(editing) return;
+  const mod=e.metaKey||e.ctrlKey;
+  if(mod && e.key.toLowerCase()==="z"){ e.preventDefault(); e.shiftKey?redo():undo(); return; }
+  if(mod && e.key.toLowerCase()==="y"){ e.preventDefault(); redo(); return; }
+  if(mod && e.key.toLowerCase()==="a" && sel){
+    const T=TM(sel.t); if(!T) return;
+    e.preventDefault(); sel={t:sel.t,r0:0,c0:0,r1:T.rows.length-1,c1:T.cols.length-1};
+    clampSel(); render(); return;
+  }
+  if(!sel) return;
+  switch(e.key){
+    case "ArrowUp":    e.preventDefault(); moveSel(-1,0,e.shiftKey); return;
+    case "ArrowDown":  e.preventDefault(); moveSel(1,0,e.shiftKey);  return;
+    case "ArrowLeft":  e.preventDefault(); moveSel(0,-1,e.shiftKey); return;
+    case "ArrowRight": e.preventDefault(); moveSel(0,1,e.shiftKey);  return;
+    case "Tab":        e.preventDefault(); moveSel(0,e.shiftKey?-1:1,false); return;
+    case " ":          e.preventDefault(); startEdit(sel.t,sel.r0,sel.c0,null); return;
+    case "Enter":      e.preventDefault(); startEdit(sel.t,sel.r0,sel.c0,null); return;
+    case "F2":         e.preventDefault(); startEdit(sel.t,sel.r0,sel.c0,null); return;
+    case "Backspace":
+    case "Delete":     e.preventDefault(); clearRange(); return;
+    case "Escape":     sel=null; render(); return;
+  }
+  if(e.key.length===1 && !mod && !e.altKey){
+    e.preventDefault(); startEdit(sel.t,sel.r0,sel.c0,e.key);
+  }
+  
+});
+
+/* ============================ MENUS ============================ */
+let openMenu=null;
+function menu(x,y,html,wire){
+  closeMenu();
+  const m=document.createElement("div"); m.className="menu"; m.innerHTML=html;
+  document.body.appendChild(m);
+  const r=m.getBoundingClientRect();
+  m.style.left=Math.min(x, innerWidth-r.width-8)+"px";
+  m.style.top=Math.min(y, innerHeight-r.height-8)+"px";
+  openMenu=m; wire && wire(m);
+  setTimeout(()=>document.addEventListener("mousedown", onDoc, {once:true}),0);
+  function onDoc(ev){ if(!m.contains(ev.target)) closeMenu(); else setTimeout(()=>document.addEventListener("mousedown",onDoc,{once:true}),0); }
+}
+function closeMenu(){ openMenu&&openMenu.remove(); openMenu=null; }
+
+function cellMenu(e){
+  const s=norm(sel), count=(s.r1-s.r0+1)*(s.c1-s.c0+1);
+  menu(e.clientX,e.clientY,
+    `<button data-a="copy">Copy</button>
+     <button data-a="clear">Clear${count>1?` ${count} cells`:""}</button>`,
+    m=>{
+      m.querySelector('[data-a="copy"]').onclick=()=>{
+        closeMenu();
+        const tsv=selTSV();
+        if(navigator.clipboard&&navigator.clipboard.writeText)
+          navigator.clipboard.writeText(tsv).then(()=>toast("Copied."),()=>toast("Copy blocked by the browser. Use ⌘C."));
+        else toast("Use ⌘C to copy.");
+      };
+      m.querySelector('[data-a="clear"]').onclick=()=>{closeMenu(); clearRange();};
+    });
+}
+function versionMenu(e, vId){
+  const n=addressesOn(vId).length;
+  menu(e.clientX,e.clientY,
+    `<div class="mlabel">Job ${esc(VER(vId).job)}${VER(vId).desc?" · "+esc(VER(vId).desc):""}</div>
+     <button data-a="open">${state.view==="master"?"Open distribution list":"Open master tickets"}</button>
+     <button data-a="dup">Duplicate master ticket</button><hr>
+     <button class="danger" data-a="del">Delete master ticket</button>
+     <div class="mnote">Its details and the quantities for ${n} address${n===1?"":"es"} go with it.</div>`,
+    m=>{
+      m.querySelector('[data-a="open"]').onclick=()=>{closeMenu();
+        state.view = state.view==="master" ? "dist" : "master"; sel=null; render();};
+      m.querySelector('[data-a="dup"]').onclick=()=>{closeMenu(); duplicateVersion(vId);};
+      m.querySelector('[data-a="del"]').onclick=()=>{closeMenu(); deleteVersion(vId);};
+    });
+}
+function addressMenu(e, aId){
+  const vs=versionsFor(aId);
+  menu(e.clientX,e.clientY,
+    `<div class="mlabel">${esc(ADDR(aId).name)}</div>
+     <button class="danger" data-a="rm">Remove from rollout</button>
+     <div class="mnote">${vs.length
+       ? `Its quantities on job${vs.length===1?"":"s"} ${esc(vs.map(v=>v.job).join(", "))} go with it.`
+       : `It has no quantities on any version.`}</div>`,
+    m=>{ m.querySelector('[data-a="rm"]').onclick=()=>{closeMenu(); removeAddress(aId);}; });
+}
+
+/* "+ Add field" — which catalog it offers depends on the table it sits
+   on, which is the point of splitting them: job header fields on the
+   master tickets table, that detail's spec fields on a detail table,
+   shipping fields on the distribution list. */
+function addColumnMenu(T, anchor){
+  if(T.kind==="master") return addJobFieldMenu(anchor);
+  if(T.kind==="detail") return addSpecMenu(T.detail, anchor);
+  return addShipFieldMenu(anchor);
+}
+
+function addJobFieldMenu(anchor){
+  const r=anchor.getBoundingClientRect();
+  const avail=JOB_CATALOG.filter(c=>!JOBFIELD[c.id]);
+  menu(r.left-160, r.bottom+4,
+    `<div class="mlabel">Job ticket field</div>` +
+    (avail.length
+      ? avail.map(c=>`<button data-job="${c.id}">${esc(c.name)}</button>`).join("")
+      : `<div class="mnote">Every job ticket field is already on this table.</div>`),
+    m=>m.querySelectorAll("[data-job]").forEach(b=>b.onclick=()=>{
+      closeMenu(); addJobField(b.dataset.job);
+    }));
+}
+function addJobField(id){
+  const c=JOB_CATALOG.find(x=>x.id===id); if(!c) return;
+  begin();
+  JOBFIELDS.push({...c}); reindexJobFields();
+  commit();
+  toast(`${c.name} added to the master tickets.`, "Undo", undo);
+}
+function jobFieldMenu(e, fId){
+  const f=JOBFIELD[fId];
+  const filled = state.versions.filter(v=>String(jobVal(v.id,fId)).trim()!=="").length;
+  menu(e.clientX,e.clientY,
+    `<div class="mlabel">${esc(f.name)}</div>
+     <button class="danger" data-a="del">Remove column</button>
+     <div class="mnote">${filled
+       ? `${filled} master ticket${filled===1?"":"s"} have a value in it. The values stay on the job tickets.`
+       : `Nothing has been entered in it yet.`}</div>`,
+    m=>{ m.querySelector('[data-a="del"]').onclick=()=>{
+      closeMenu();
+      if(JOBFIELDS.length<=1){ toast("The master tickets table needs at least one field."); return; }
+      begin();
+      JOBFIELDS=JOBFIELDS.filter(x=>x.id!==fId); reindexJobFields();
+      sel=null; commit();
+      toast(`${f.name} removed.`, "Undo", undo);
+    };});
+}
+
+/* ── Add a spec column to a detail table ───────────────────────
+   One step now: the table already says which detail this is, so all
+   that is left to pick is the section and field from the job
+   maintenance catalog.
+   ------------------------------------------------------------- */
+function addSpecMenu(detail, anchor){
+  const r=anchor.getBoundingClientRect();
+  const taken = new Set(specsFor(detail).map(sp=>specKey(sp)));
+  const body = Object.entries(SPEC_CATALOG).map(([section, fields])=>
+    `<div class="mlabel">${section}</div>` +
+    fields.map(f=>{
+      const key=section+"|"+f;
+      return `<button data-spec="${section}|${f}" ${taken.has(key)?"disabled":""}>${f}${taken.has(key)?" ✓":""}</button>`;
+    }).join("")).join("<hr>");
+  const nm=detailName(detail);
+  menu(r.left-220, r.bottom+4,
+    `<div class="mlabel">Detail ${detail+1}${nm?` · ${esc(nm)}`:""} — which field?</div>${body}`,
+    m=>m.querySelectorAll("[data-spec]:not([disabled])").forEach(b=>b.onclick=()=>{
+      closeMenu();
+      const [section, field] = b.dataset.spec.split("|");
+      addSpec(detail, section, field);
+    }));
+}
+function addSpec(detail, section, field){
+  begin();
+  SPECS.push({id:nextId("sp", SPECS), detail, section, field});
+  commit();
+  toast(`${specLabel({section, field})} added to detail ${detail+1}.`, "Undo", undo);
+}
+function specMenu(e, spId){
+  const sp=SPEC(spId);
+  const filled = versionsWithDetail(sp.detail)
+    .filter(v=>String(v.details[sp.detail].specs[specKey(sp)]??"").trim()!=="").length;
+  menu(e.clientX,e.clientY,
+    `<div class="mlabel">${esc(specLabel(sp))} — detail ${sp.detail+1}</div>
+     <button class="danger" data-a="del">Remove column</button>
+     <div class="mnote">${filled
+       ? `${filled} master ticket${filled===1?"":"s"} have a value in it.`
+       : `Nothing has been entered in it yet.`} Values stay on the job tickets.</div>`,
+    m=>{ m.querySelector('[data-a="del"]').onclick=()=>{
+      closeMenu(); begin(); SPECS=SPECS.filter(x=>x.id!==spId); sel=null; commit();
+      toast("Column removed.", "Undo", undo);
+    };});
+}
+
+/* ── Add a distribution list field ─────────────────────────────
+   The catalog is the job maintenance shipping tab: nothing here is
+   invented for the rollout.
+   ------------------------------------------------------------- */
+function addShipFieldMenu(anchor){
+  const r=anchor.getBoundingClientRect();
+  const avail=SHIP_CATALOG.filter(c=>!FIELD[c.id]);
+  menu(r.left-120, r.bottom+4,
+    `<div class="mlabel">Shipping field</div>` +
+    (avail.length
+      ? avail.map(c=>`<button data-ship="${c.id}">${esc(c.name)}
+          <div class="mnote mnote--inline">One value per address, shared by every version it receives.</div></button>`).join("")
+      : `<div class="mnote">Every shipping field is already on this rollout.</div>`),
+    m=>m.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{
+      closeMenu(); addShipField(b.dataset.ship);
+    }));
+}
+function addShipField(id){
+  const c=SHIP_CATALOG.find(x=>x.id===id); if(!c) return;
+  begin();
+  FIELDS.push({...c}); reindexFields();
+  commit();
+  toast(`${c.name} added to the distribution list.`, "Undo", undo);
+}
+function fieldMenu(e, fId){
+  const f=FIELD[fId];
+  const filled = Object.keys(state.addrValues).filter(k=>k.endsWith("::"+fId)).length;
+  menu(e.clientX,e.clientY,
+    `<div class="mlabel">${esc(f.name)}</div>
+     <button class="danger" data-a="del">Remove field</button>
+     <div class="mnote">${filled
+       ? `${filled} address value${filled===1?"":"s"} go with it.`
+       : `Nothing has been entered in it yet.`}</div>`,
+    m=>{ m.querySelector('[data-a="del"]').onclick=()=>{closeMenu(); deleteField(fId);}; });
+}
+function deleteField(fId){
+  if(FIELDS.length<=1){ toast("A rollout needs at least one field."); return; }
+  begin();
+  const nm=FIELD[fId].name;
+  FIELDS=FIELDS.filter(f=>f.id!==fId); reindexFields();
+  Object.keys(state.addrValues).forEach(k=>{ if(k.endsWith("::"+fId)) delete state.addrValues[k]; });
+  sel=null; commit();
+  toast(`${nm} removed from the distribution list.`, "Undo", undo);
+}
+
+/* ============================ STRUCTURAL OPS ============================ */
+function addVersion(){
+  begin();
+  const id=nextId("v", state.versions);
+  const base=state.versions[state.versions.length-1];
+  /* The new ticket takes the shape of the last one — the same details,
+     so it lands on the same detail tables — but none of its values. */
+  state.versions.push({id, job:nextJob(), desc:"", fields:{},
+    details: base ? base.details.map(d=>({name:d.name, specs:{}})) : [{name:"Inserts", specs:{}}]});
+  commit();
+  state.view="master"; render();
+  const ri=state.versions.length-1;
+  const th=document.querySelectorAll('[data-table="master"] tbody th.hd')[ri];
+  if(th) inlineRename(th, state.versions[ri].job, v=>{ begin(); state.versions[ri].job=v||state.versions[ri].job; commit(); });
+  toast("Master ticket added. Set its job number, then enter quantities on the distribution list.", "Undo", undo);
+}
+function duplicateVersion(vId){
+  begin();
+  const src=VER(vId), id=nextId("v", state.versions);
+  state.versions.push({id, job:nextJob(), desc:src.desc, fields:{...(src.fields||{})},
+    details: JSON.parse(JSON.stringify(src.details))});
+  state.addresses.forEach(a=>{ if(receives(vId, a.id)) setQty(id, a.id, getQty(vId, a.id)); });
+  commit();
+  toast("Master ticket duplicated with its details and quantities.", "Undo", undo);
+}
+function deleteVersion(vId){
+  if(state.versions.length<=1){ toast("A rollout needs at least one master ticket."); return; }
+  begin();
+  state.versions=state.versions.filter(v=>v.id!==vId);
+  Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[0]===vId) delete state.qtys[k]; });
+  sel=null; commit();
+  toast("Master ticket deleted.", "Undo", undo);
+}
+function removeAddress(aId){
+  begin();
+  state.addresses=state.addresses.filter(a=>a.id!==aId);
+  Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[1]===aId) delete state.qtys[k]; });
+  Object.keys(state.addrValues).forEach(k=>{ if(k.split("::")[0]===aId) delete state.addrValues[k]; });
+  sel=null; commit();
+  toast("Address removed from the rollout.", "Undo", undo);
+}
+function newAddress(){
+  begin();
+  const id=nextId("a", state.addresses);
+  state.addresses.push({id, name:"New address", city:"—"});
+  commit();
+  setSel(0, state.addresses.length-1, 0, false);
+  toast("Address added. Name it, then enter a quantity on each version it receives.", "Undo", undo);
+}
+
+function wirePencil(th, getName, setName){
+  const b=th.querySelector(".pencil"); if(!b) return;
+  b.onclick=ev=>{ ev.stopPropagation();
+    inlineRename(th, getName(), val=>{ begin(); setName(val||getName()); commit(); });
+  };
+}
+function inlineRename(host, cur, done){
+  const inp=document.createElement("input");
+  inp.className="editor"; inp.value=cur; host.appendChild(inp); inp.focus(); inp.select();
+  const fin=save=>{ const v=inp.value.trim(); inp.remove(); if(save) done(v); else render(); };
+  inp.onblur=()=>fin(true);
+  inp.onkeydown=ev=>{ ev.stopPropagation();
+    if(ev.key==="Enter"){ev.preventDefault();fin(true);} if(ev.key==="Escape"){ev.preventDefault();fin(false);} };
+}
+
+/* ============================ TOAST ============================ */
+let toastEl=null, toastT=null;
+function toast(msg, actionLabel, action){
+  toastEl&&toastEl.remove(); clearTimeout(toastT);
+  toastEl=document.createElement("div"); toastEl.className="toast";
+  toastEl.innerHTML=`<span>${esc(msg)}</span>`;
+  if(actionLabel){
+    const b=document.createElement("button"); b.textContent=actionLabel;
+    b.onclick=()=>{ toastEl.remove(); toastEl=null; action(); };
+    toastEl.appendChild(b);
+  }
+  document.body.appendChild(toastEl);
+  toastT=setTimeout(()=>{ toastEl&&toastEl.remove(); toastEl=null; }, 5200);
+}
+
+/* ============================ WIRING ============================ */
+function esc(s){ return String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+
+document.getElementById("tabMaster").onclick=()=>{ state.view="master"; sel=null; render(); };
+document.getElementById("tabDist").onclick =()=>{ state.view="dist";   sel=null; render(); };
+
+/* The two things a finished rollout is FOR. Neither is built — each
+   reports what it would act on, so the shape of the output can be
+   argued about before anyone writes it. */
+document.getElementById("shipTracker").onclick=()=>{
+  const lines=state.versions.reduce((n,v)=>n+addressesOn(v.id).length, 0);
+  toast(`Ship tracker for ${lines.toLocaleString()} shipment${lines===1?"":"s"} across ${state.addresses.length} address${state.addresses.length===1?"":"es"}.`);
+};
+document.getElementById("createTickets").onclick=()=>{
+  const lines=state.versions.reduce((n,v)=>n+addressesOn(v.id).length, 0);
+  toast(`${lines.toLocaleString()} ticket${lines===1?"":"s"} created from ${state.versions.length} master ticket${state.versions.length===1?"":"s"}.`);
+};
+
+render();
+
+</script>
+    <!-- ══════════════════════════════════════════════════════════
+         IMPLEMENTATION NOTES
+         ──────────────────────────────────────────────────────────
+         Layout
+           Every band puts its content in a .page-width, which is full width
+           here — the grid is the page. Put a max-width on that one class to
+           give the whole page a measure.
+
+         Design system
+           shared/css/design-tokens.css (PL-SHARED submodule) supplies
+           every color, type, space and radius value, plus .btn-*,
+           .tab-btn and .pill. Prototype-only values live in the LOCAL
+           TOKENS block at the top of rollout-manager.css — build those
+           into the component rather than adding them to PL-SHARED.
+
+         Components → markup and styles
+           AppShell          → sidebar injected by
+                               shared/components/sidebar-component.js,
+                               .main-content styles in rollout-manager.css
+           Breadcrumbs       → .breadcrumb-bar markup here,
+                               components/breadcrumbs/breadcrumbs.css
+           RolloutTopbar     → <header class="rollout-topbar"> + .rollout-topbar,
+                               .version-pick, .select styles
+           ViewTabs          → .tab-row markup here; button is the shared
+                               .tab-btn, row styles in rollout-manager.css
+           RolloutOutputs    → #shipTracker / #createTickets in the topbar
+           TableSection      → <template id="tableSectionTemplate">,
+                               .grid-section + .viewhost styles; one per
+                               table, cloned by renderTables()
+           RolloutGrid       → table built by buildTable(),
+                               grid + versions row + selection styles
+           ColumnReorder     → wireColumnDrag() / moveColumn(); .hd-move,
+                               .hd-pinned, .grip, .is-dragging, .drop-before,
+                               .drop-after styles
+           CellEditor        → input.editor mounted by mountEditor(), .editor styles
+           ContextMenu       → built by menu(), .menu styles
+           Toast             → built by toast(), .toast styles
+
+         What each tab shows
+           Master tickets    → a STACK of tables, because several parts can go
+                               into the one piece that ships and each part has
+                               its own specs.
+
+                               Table 1, "Master tickets": every ticket in the
+                               rollout. This is where tickets are added and
+                               removed, and where the job header fields live
+                               (JOBFIELDS, from JOB_CATALOG) beside Quantity
+                               Shipping, the read-only sum of that ticket's
+                               quantities.
+
+                               JOB_CATALOG is the JM "Edit job information"
+                               modal, field for field, in its order:
+                               For Distribution, PO Number, PO Name, Job
+                               Description, Job Type, Old Job Num, Production
+                               Type, Menu Code. Job Type and Production Type
+                               take that modal's values as a type-ahead —
+                               typed, not picked: it completes inline, lists
+                               what matches, and refuses anything off the
+                               list. For Distribution is a checkbox cell with
+                               no editor, toggled by click or Space and
+                               stored as "Yes" or empty so it survives a copy
+                               out to TSV. Old Job Num greys to "n/a" where
+                               Job Type is New Job, which is that
+                               modal's collapse rule (onJobTypeChange) as a
+                               per-row condition. Three columns are on by
+                               default, the rest are under "+ Add field".
+
+                               Then one table per DETAIL POSITION any ticket
+                               has, listing only the tickets that have that
+                               detail. Its columns are that detail's specs
+                               (SPECS filtered by sp.detail, catalog from
+                               SPEC_CATALOG = the JM detail-edit modal), in
+                               front of which sit two identifying columns:
+                               Job Description (read-only, from the ticket)
+                               and Detail Description (this ticket's name for
+                               the part, editable).
+
+                               Details themselves are added and removed on the
+                               job ticket, not here — a detail table exists
+                               because the data has a detail there, and it
+                               disappears when the last ticket loses it. That
+                               is why nothing on these tables creates one.
+           Distribution list → every address down the side; one quantity
+                               column per version, then the JM shipping fields
+                               (SHIP_CATALOG), which are per address only.
+
+         The distribution list IS the quantities. state.qtys is keyed
+         "versionId::addressId", and a quantity is also the membership
+         record: receives() is "has a non-empty quantity", so there is no
+         separate list of which addresses are on which version to keep in
+         step, nothing to lock, and no version to switch between.
+
+         Simulated in JS, becomes Angular state/events
+           - All data is the in-memory `state` object; no persistence layer.
+           - View switching, version picker → component state + router params.
+           - The type-ahead is autocomplete() — inline completion, a filtered
+             list on <body> (a cell clips its own overflow), arrow keys, and
+             a commit that refuses a value not on the list. Swap for the
+             team's combobox; the contract is "typed, validated against a
+             fixed list", not "dropdown".
+           - Those option lists and the Old Job Num condition are hardcoded
+             from the JM modal. They belong to the job ticket, not the
+             rollout, so in Angular they come from whatever already feeds
+             that modal rather than being redeclared here. A pasted or
+             filled value is still not validated against them — only typing
+             is.
+           - A view is model() → an array of table models, each with its own
+             rows/cols/cellAt. Selection carries the table index (sel.t) and a
+             range never spans two tables; in Angular each table is one
+             component instance and the selection service is per instance.
+           - Create Ship Tracker and Create Tickets are not built. Each toasts
+             what it would act on so the shape of the output can be argued
+             about first. Undo/redo have no toolbar buttons: Cmd/Ctrl+Z and
+             the Undo action on each toast.
+           - Selection, drag-select, fill handle, clipboard TSV, undo/redo →
+             a grid directive or a third-party grid; the undo stack is whole-state
+             JSON snapshots and should become a command log.
+           - Column reordering is native HTML5 drag and drop on the <th>. Column
+             order IS the order of SPECS (master) / FIELDS (distribution list),
+             so a move is one splice on that array — in Angular, reorder the
+             array the columns *ngFor over (or use CDK drag-drop) and persist it
+             per user. Only columns flagged `movable` are draggable AND droppable;
+             `pinned` columns (Calculated Quantity, and the quantity columns)
+             are neither, which is what stops anything landing in front of them.
+           - Context menus are hand-built divs; swap for the team's menu component.
+           - receives() / versionsFor() / addressesOn() / versionTotal() are the
+             real domain logic and should move to a service as written.
+
+         Only there to make the prototype demonstrable
+           - Seed data in rollout-data.js (a real rollout: Fogo de Chao
+             0929, six master tickets x 94 locations). window.ROLLOUT_DATA
+             feeds state and SPECS; the header reads rollout.customer and
+             rollout.name. Replace with an API response.
+           - toast() and its 5.2s timer.
+           - inlineRename() reusing .editor for header renames.
+         ══════════════════════════════════════════════════════════ -->
+
+  </body>
+</html>

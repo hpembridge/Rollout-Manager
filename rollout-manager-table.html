@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rollout Manager — table</title>
+    <script src="https://kit.fontawesome.com/da08280601.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="shared/css/design-tokens.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
+    <link rel="stylesheet" href="rollout-manager-table.css" />
+    <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
+    <link rel="stylesheet" href="components/modal-shell/modal-shell.css" />
+    <script src="rollout-data.js"></script>
+    <script>
+      window.SIDEBAR_CONFIG = {
+        activeItem: 'Jobs',
+        user: { name: 'Healey Pembridge', role: 'ui/ux designer' }
+      };
+    </script>
+  </head>
+  <body>
+    <script src="shared/components/sidebar-component.js"></script>
+
+    <div class="main-content">
+
+      <!-- ══ Breadcrumb bar ═══════════════════════════════════ -->
+      <div class="breadcrumb-bar">
+        <nav class="breadcrumbs">
+          <a class="crumb" href="#"><i class="fa-regular fa-folder"></i> Jobs</a>
+          <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
+          <a class="crumb" href="#">Rollout Manager</a>
+          <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
+          <span class="crumb current" id="rolloutCrumb">Rollout</span>
+        </nav>
+      </div>
+
+      <!-- ══ Topbar ═══════════════════════════════════════════ -->
+      <header class="rollout-topbar">
+        <div class="page-width rollout-topbar__inner">
+          <div class="rollout-title">
+            Rollout Manager <span class="rollout-title__sub" id="rolloutName"></span>
+          </div>
+          <div class="topbar-spacer"></div>
+        </div>
+      </header>
+
+      <!-- ══ View tabs ════════════════════════════════════════ -->
+      <div class="rollout-tabs">
+        <div class="page-width">
+          <div class="tab-row" role="group" aria-label="View">
+            <button class="tab-btn" type="button" id="tabMaster" aria-pressed="false">Master tickets</button>
+            <button class="tab-btn active" type="button" id="tabDist" aria-pressed="true">Distribution list</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-scroll">
+        <div class="page-width">
+
+          <!-- ══ Master tickets panel ═══════════════════════════
+               One row per master ticket. Calculated Quantity totals
+               that job's column on the distribution list; the specs
+               are the job ticket's detail-1 fields.
+               ───────────────────────────────────────────────── -->
+          <section class="panel hidden-section" id="panel-master">
+            <div class="panel-card">
+              <table class="data" id="masterTable">
+                <thead>
+                  <tr>
+                    <th class="left">Job</th>
+                    <th class="left">Description</th>
+                    <th class="num">Calculated Quantity</th>
+                    <th>Insert Size</th>
+                    <th>Paper Type</th>
+                    <th>Paper Color</th>
+                    <th>Paper Weight</th>
+                    <th># Panels</th>
+                    <th># Sides</th>
+                    <th class="col-actions"></th>
+                  </tr>
+                </thead>
+                <tbody id="masterBody"><!-- masterRowTemplate rows --></tbody>
+              </table>
+
+              <!-- The house add affordance: a full-width row under the
+                   list it adds to, same as Add Item / Add Unit Type. -->
+              <button class="add-row" type="button" id="addMasterBtn">
+                <i class="fa-regular fa-plus add-row__icon"></i> Add Master Ticket
+              </button>
+            </div>
+          </section>
+
+          <!-- ══ Distribution list panel ════════════════════════
+               The address list: one row per location, a quantity per
+               job, and how that location ships. Rows are selectable
+               for bulk edits.
+               ───────────────────────────────────────────────── -->
+          <section class="panel" id="panel-dist">
+            <div class="panel-card is-flush">
+
+              <!-- Search + list actions -->
+              <div class="search-list-header">
+                <input type="text" class="search-input" id="addrSearch"
+                       placeholder="Search addresses, codes, cities…" aria-label="Search addresses" />
+                <button class="icon-btn" type="button" id="addAddressBtn2" title="Add address">
+                  <i class="fa-regular fa-plus"></i>
+                </button>
+                <button class="icon-btn" type="button" id="colSettingsBtn" title="Table settings">
+                  <i class="fa-regular fa-gear"></i>
+                </button>
+              </div>
+
+              <!-- Address table -->
+              <div class="table-wrap">
+                <table class="data dist-table" id="distTable">
+                  <thead>
+                    <tr id="distHeadGroup">
+                      <th class="col-cb" rowspan="2">
+                        <label class="cb-cell-label">
+                          <input type="checkbox" class="select-all-cb" id="selectAllAddresses" aria-label="Select all addresses" />
+                        </label>
+                      </th>
+                      <th class="left col-addr" rowspan="2">
+                        <button class="th-sort" type="button" data-sort="name">Address <i class="fa-solid fa-sort"></i></button>
+                      </th>
+                      <!-- quantity group cell inserted here by script -->
+                      <th class="col-ship" rowspan="2">Carrier</th>
+                      <th class="col-ship col-account" rowspan="2">Account</th>
+                      <th class="col-ship" rowspan="2">Method</th>
+                      <th class="col-ship" rowspan="2">Attn</th>
+                      <th class="col-notes" rowspan="2">Additional information</th>
+                      <th class="col-actions" rowspan="2"></th>
+                    </tr>
+                    <tr id="distHeadJobs"><!-- jobHeadTemplate cells --></tr>
+                  </thead>
+                  <tbody id="distBody"><!-- addressRowTemplate rows --></tbody>
+                  <tfoot>
+                    <tr id="distTotals">
+                      <td></td>
+                      <td class="left total-label">Totals</td>
+                      <!-- job total cells inserted by script -->
+                      <td colspan="6"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <!-- List footer: count, selection actions, import/export -->
+              <div class="list-footer">
+                <div class="list-footer-left">
+                  <span class="list-footer-count" id="addrCount">0 ADDRESSES</span>
+                  <div class="selection-actions" id="selectionActions">
+                    <button class="inline-icon-btn" type="button" id="bulkEditBtn" title="Edit selected">
+                      <i class="fa-regular fa-pen"></i>
+                    </button>
+                    <button class="inline-icon-btn" type="button" id="bulkRemoveBtn" title="Remove selected">
+                      <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                    <button class="inline-icon-btn" type="button" id="clearSelBtn" title="Deselect all">
+                      <i class="fa-regular fa-xmark"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="list-footer-right">
+                  <button class="icon-btn" type="button" title="Export address list">
+                    <i class="fa-solid fa-arrow-down-from-bracket"></i>
+                  </button>
+                  <button class="icon-btn" type="button" title="Import addresses">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+        </div>
+      </div>
+      <!-- /.page-scroll -->
+
+    </div>
+    <!-- /.main-content -->
+
+    <!-- ══ MODAL: Edit selected addresses ═══════════════════════
+         Every field is optional: a blank one leaves that value alone
+         on each selected row. Same shape as the job maintenance
+         ship-edit modal in bulk mode.
+         ───────────────────────────────────────────────────────── -->
+    <div class="modal-overlay" id="modal-bulkEdit">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <span class="modal-title">Edit <span id="bulkCount">0</span> selected addresses</span>
+          <button class="icon-btn" type="button" data-close="bulkEdit"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-note">Leave a field blank to keep what each address already has.</p>
+
+          <div class="form-group">
+            <label class="form-label" for="bulkJob">Quantity for</label>
+            <div class="form-row form-row-2">
+              <select class="form-select" id="bulkJob"><!-- job options --></select>
+              <input class="form-input" id="bulkQty" type="text" inputmode="numeric" placeholder="Quantity" />
+            </div>
+            <p class="form-hint">Clearing the quantity takes those addresses off the job.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bulkCarrier">Carrier</label>
+            <select class="form-select" id="bulkCarrier">
+              <option value="">— leave unchanged —</option>
+              <option>UPS</option>
+              <option>FedEx</option>
+              <option>USPS</option>
+              <option>Will Call</option>
+            </select>
+          </div>
+
+          <div class="form-row form-row-2 form-group">
+            <div>
+              <label class="form-label" for="bulkAccount">Account</label>
+              <select class="form-select" id="bulkAccount">
+                <option value="">— leave unchanged —</option>
+                <option>Customer Account (648328494)</option>
+                <option>Custom (740561073)</option>
+                <option>CMP UPS Account</option>
+                <option>CMP FedEx Account</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="bulkMethod">Method</label>
+              <select class="form-select" id="bulkMethod">
+                <option value="">— leave unchanged —</option>
+                <option>Ground</option>
+                <option>2Day</option>
+                <option>Standard Overnight</option>
+                <option>Priority Overnight</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bulkAttn">Attn</label>
+            <input class="form-input" id="bulkAttn" type="text" placeholder="Leave blank to keep each address's own" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bulkNotes">Additional information</label>
+            <input class="form-input" id="bulkNotes" type="text" placeholder="Leave blank to keep each address's own" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" type="button" data-close="bulkEdit">Cancel</button>
+          <button class="btn-primary" type="button" id="bulkApplyBtn">Apply to selected</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MODAL: Remove selected ═══════════════════════════════ -->
+    <div class="modal-overlay modal-centered" id="modal-removeConfirm">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <span class="modal-title">Remove addresses from this rollout?</span>
+          <button class="icon-btn" type="button" data-close="removeConfirm"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p><span id="removeCount">0</span> addresses and their quantities on every job will be removed.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" type="button" data-close="removeConfirm">Cancel</button>
+          <button class="btn-primary is-danger" type="button" id="removeConfirmBtn">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Toast host ═══════════════════════════════════════════ -->
+    <div class="toast-host" id="toastHost"></div>
+
+    <!-- ══ Templates ════════════════════════════════════════════
+         Angular: each template below is one component's markup —
+         the row templates become @for bodies over addresses and
+         jobs, and the JS that clones them goes away.
+         ───────────────────────────────────────────────────────── -->
+
+    <template id="masterRowTemplate">
+      <tr class="master-row">
+        <td class="left col-job">
+          <input type="text" class="cell-field job-no" data-master="job" aria-label="Job number" placeholder="Job #" />
+        </td>
+        <td class="left col-desc">
+          <input type="text" class="cell-field" data-master="desc" aria-label="Description" placeholder="Description" />
+        </td>
+        <td class="num total-cell" data-field="total"></td>
+        <td><input type="text" class="cell-field" data-spec="General|Insert Size" aria-label="Insert size" /></td>
+        <td><input type="text" class="cell-field" data-spec="Paper|Type" aria-label="Paper type" /></td>
+        <td><input type="text" class="cell-field" data-spec="Paper|Color" aria-label="Paper color" /></td>
+        <td><input type="text" class="cell-field" data-spec="Paper|Weight" aria-label="Paper weight" /></td>
+        <td><input type="text" class="cell-field is-num" data-spec="General|Number of Panels" aria-label="Number of panels" /></td>
+        <td><input type="text" class="cell-field is-num" data-spec="General|Number of Sides" aria-label="Number of sides" /></td>
+        <td class="col-actions">
+          <button class="icon-btn master-remove" type="button" title="Delete master ticket">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <template id="jobGroupHeadTemplate">
+      <th class="col-qty-group">Quantity</th>
+    </template>
+
+    <template id="jobHeadTemplate">
+      <th class="col-qty">
+        <button class="th-sort th-sort--stack" type="button">
+          <span class="job-no" data-field="job"></span>
+          <span class="job-desc" data-field="desc"></span>
+          <i class="fa-solid fa-sort"></i>
+        </button>
+      </th>
+    </template>
+
+    <template id="jobTotalTemplate">
+      <td class="num col-qty" data-field="total"></td>
+    </template>
+
+    <template id="addressRowTemplate">
+      <tr class="address-row">
+        <td class="col-cb">
+          <label class="cb-cell-label">
+            <input type="checkbox" class="row-check" aria-label="Select address" />
+          </label>
+        </td>
+        <td class="left col-addr">
+          <div class="addr-line">
+            <span class="addr-name" data-field="name"></span>
+            <span class="addr-code" data-field="code"></span>
+          </div>
+          <span class="addr-city" data-field="city"></span>
+          <span class="addr-street" data-field="street"></span>
+        </td>
+        <!-- one qtyCellTemplate per job inserted here -->
+        <td class="col-ship"><input type="text" class="cell-field" data-addrfield="carrier" aria-label="Carrier" /></td>
+        <td class="col-ship col-account"><input type="text" class="cell-field" data-addrfield="account" aria-label="Account" /></td>
+        <td class="col-ship"><input type="text" class="cell-field" data-addrfield="method" aria-label="Method" /></td>
+        <td class="col-ship"><input type="text" class="cell-field" data-addrfield="attn" aria-label="Attn" /></td>
+        <td class="col-notes"><input type="text" class="cell-field" data-addrfield="notes" aria-label="Additional information" placeholder="—" /></td>
+        <td class="col-actions">
+          <button class="icon-btn row-remove" type="button" title="Remove from rollout">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <template id="qtyCellTemplate">
+      <td class="col-qty">
+        <input type="text" inputmode="numeric" class="cell-field is-num is-qty" aria-label="Quantity" placeholder="—" />
+      </td>
+    </template>
+
+    <template id="toastTemplate">
+      <div class="toast">
+        <span class="toast-text"></span>
+        <button class="toast-action" type="button">Undo</button>
+      </div>
+    </template>
+
+    <script src="rollout-manager-table.js"></script>
+
+    <!-- ══════════════════════════════════════════════════════════
+         IMPLEMENTATION NOTES
+         ──────────────────────────────────────────────────────────
+         This is the table alternative to rollout-manager.html: the
+         same data, the same model, but a job-maintenance-style list
+         with checkbox selection and bulk edit instead of a
+         spreadsheet grid. Cells are click-in inputs (.cell-field),
+         the recipe from the inventory prototype.
+
+         Components → markup and styles
+           AppShell         → sidebar-component.js + .main-content
+           Breadcrumbs      → components/breadcrumbs/breadcrumbs.css
+           RolloutTopbar    → <header class="rollout-topbar">
+           ViewTabs         → .tab-row + shared .tab-btn
+           MasterTable      → #masterTable + #masterRowTemplate
+           DistListHeader   → .search-list-header
+           DistTable        → #distTable, #addressRowTemplate,
+                              #qtyCellTemplate, #jobHeadTemplate
+           ListFooter       → .list-footer (count, selection actions)
+           BulkEditModal    → #modal-bulkEdit (modal-shell.css)
+           RemoveConfirm    → #modal-removeConfirm
+           Toast            → #toastTemplate + .toast-host
+
+         Data
+           rollout-data.js — the real Fogo de Chao 0929 rollout:
+           six master tickets x 94 locations. A quantity is also the
+           membership record: an address with no quantity for a job
+           is not on that job.
+
+         Simulated in JS, becomes Angular state/events
+           - Row cloning from <template> → @for over addresses/jobs.
+           - Selection, select-all, indeterminate state → a signal
+             holding selected ids.
+           - Search filter → a computed filtered list, not a
+             .row-hidden class.
+           - Sort → a computed sort key.
+           - Bulk apply, remove, toast + undo → service calls.
+           - Column settings and import/export buttons are inert.
+         ══════════════════════════════════════════════════════════ -->
+
+  </body>
+</html>

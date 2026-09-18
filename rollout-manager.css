@@ -1,0 +1,675 @@
+/* ============================================================
+   Rollout Manager — page styles
+   ------------------------------------------------------------
+   Built on the shared design system: shared/css/design-tokens.css
+   supplies every color, space, type and radius value, plus the
+   shared .btn-*, .tab-btn, .pill and .type-* recipes this file
+   extends. No primitives are referenced below the LOCAL TOKENS
+   block.
+
+   Component order matches the markup in rollout-manager.html:
+     Local tokens → App shell → Topbar → Context strip → Grid
+     → Scope chips → Versions row → Selection → Editor
+     → Inspector → Menus → Toast
+   ============================================================ */
+
+/* ── Local tokens ──────────────────────────────────────────────
+   Gaps in design-tokens.css, plus grid geometry that is off the
+   4px scale. Each maps to a primitive or a semantic token here and
+   is used semantically everywhere else, so promoting one upstream
+   is a one-line change. Candidates for the Figma collection:
+     --shadow-menu       (built like the existing --overlay-* tokens)
+     --duration-fast     (no motion tokens in the system yet)
+     --rm-danger-text    (no destructive-text token exists; --color-red-300
+                          fails contrast at this size and --color-red-900 is
+                          reserved for rejected-input help text, so copper-600
+                          stands in until the system defines one)
+   ------------------------------------------------------------- */
+:root {
+  --shadow-menu: 0 8px 24px rgb(from var(--color-black) r g b / .16);
+  --duration-fast: .15s;
+
+  /* Destructive menu text — see note above. */
+  --rm-danger-text: var(--color-copper-600);
+  --rm-danger-bg: var(--status-error-bg);
+
+  /* Grid geometry. Row height is set by the 28px cell plus its 1px
+     rule, so it does not land on the spacing scale. */
+  --rm-cell-height: 28px;
+  /* A stacked two-line header — number over description, with padding. */
+  --rm-stack-height: 52px;
+  --rm-row-height: 29px;
+  /* The master ticket tables put only the job number in the row head. */
+  --rm-rowhead-width: 150px;
+  --rm-rowhead-width-dist: 188px;
+
+  /* Grid chrome surfaces. */
+  --rm-head-bg: var(--bg-subtle);
+  --rm-head-bg-hover: color-mix(in srgb, var(--interactive-default) 12%, var(--bg-subtle));
+  --rm-head-bg-selected: color-mix(in srgb, var(--interactive-default) 18%, var(--bg-surface));
+  --rm-rowhead-bg: var(--bg-muted);
+  --rm-blank-bg: var(--bg-muted);
+
+  /* Versions row — the accent (gold) family, so it reads as a
+     different kind of row from the data grid. */
+  --rm-versions-bg: var(--accent-bg);
+  --rm-versions-border: color-mix(in srgb, var(--accent-default) 45%, var(--bg-surface));
+  --rm-versions-ink: var(--accent-strong);
+  --rm-versions-selected: color-mix(in srgb, var(--accent-default) 28%, var(--accent-bg));
+
+  /* Selection tints. */
+  --rm-sel-bg: var(--interactive-bg-subtle);
+  --rm-sel-edge: var(--interactive-default);
+
+  /* Toast action link, on the inverse surface. */
+  --rm-toast-action: var(--color-patina-200);
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html { height: 100%; }
+
+/* ── App shell ─────────────────────────────────────────────────
+   The shared sidebar component inserts its <aside> as body's first
+   child, so body itself is the app shell flex row.
+   ------------------------------------------------------------- */
+body {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family-primary);
+  font-size: var(--fontsize-body-sm);
+  line-height: var(--line-height-body-sm);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Content band ──────────────────────────────────────────────
+   Full width: the grid is the page, and capping it at a container
+   width only pushed the columns into a horizontal scroll while
+   leaving canvas either side. The wrapper stays so a width can be
+   put back in one place if a narrower measure is wanted.
+   ------------------------------------------------------------- */
+.page-width { width: 100%; }
+.breadcrumbs { max-width: none; }
+
+/* ══ Topbar ═══════════════════════════════════════════════════
+   Rollout name, the two view tabs, the version picker (distribution
+   view only) and the history controls.
+   ───────────────────────────────────────────────────────────── */
+.rollout-topbar {
+  padding: var(--scale-200) var(--scale-800);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-tertiary);
+  flex: none;
+}
+.rollout-topbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-400);
+}
+
+.rollout-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--fontsize-body-md);
+  white-space: nowrap;
+}
+/* Pushes the rollout outputs to the right edge of the bar. */
+.topbar-spacer { flex: 1; }
+
+.rollout-title .rollout-title__sub {
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-light);
+}
+
+/* ══ View tabs ════════════════════════════════════════════════
+   The button is .tab-btn from design-tokens.css, unchanged. Only the
+   row is local — same arrangement as .tab-row on the inventory item
+   page, capped so two tabs do not stretch the full data width.
+   ───────────────────────────────────────────────────────────── */
+.rollout-tabs {
+  flex: none;
+  padding: var(--scale-400) var(--scale-800) var(--scale-400);
+}
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--scale-300);
+}
+.tab-row .tab-btn { min-width: fit-content; }
+
+/* ══ Grid ═════════════════════════════════════════════════════
+   A view is a list of tables, each in its own .grid-section. Built by
+   renderTables(); every cell carries data-t / data-r / data-c so
+   selection and editing can find it.
+   ───────────────────────────────────────────────────────────── */
+
+/* The stack of tables. One table (the distribution list) fills the
+   height and scrolls inside itself, so its header stays put over 94
+   rows. Several short tables (master tickets and its details) scroll
+   as a page instead. */
+.viewhost {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.viewhost--stack { overflow-y: auto; }
+.viewhost--stack .grid-section { flex: none; }
+.viewhost--single .grid-section { flex: 1; min-height: 0; }
+
+.grid-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* A table's heading. The first table in a stack sits under the tab
+   row, which already carries the space above it. */
+.grid-section__head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-300);
+  padding: var(--scale-500) var(--scale-800) var(--scale-200);
+}
+.viewhost--stack .grid-section:first-child .grid-section__head { padding-top: 0; }
+.viewhost--single .grid-section__head { display: none; }
+
+.grid-section__title {
+  margin: 0;
+  font-size: var(--fontsize-body-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.grid-section__sub {
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-light);
+}
+/* No padding at the top: a sticky header sticks to the scrollport,
+   which includes the padding, so any top padding leaves a strip where
+   rows scroll past above the header. The spacing above the grid lives
+   on the heading instead. */
+.gridwrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--scale-800) var(--scale-800);
+  position: relative;
+}
+
+/* The table starts at the left edge and runs as wide as its columns. */
+.grid-host { display: flex; justify-content: flex-start; }
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--bg-surface);
+  table-layout: fixed;
+  /* Columns keep the width they declare. Without this, a table wider
+     than its scroller is squeezed to fit instead of scrolling, and
+     fixed layout shrinks every column proportionally — which is what
+     was crushing the quantity headers and the shipping fields. */
+  min-width: max-content;
+}
+
+th, td {
+  border-right: 1px solid var(--border-tertiary);
+  border-bottom: 1px solid var(--border-tertiary);
+  padding: 0;
+  height: var(--rm-row-height);
+  text-align: left;
+  font-weight: var(--font-weight-light);
+  vertical-align: middle;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Two-row head ──────────────────────────────────────────────
+   A spanning group header over the columns that share a group, with
+   each column's own label stacked beneath it. Both rows stick.
+   ------------------------------------------------------------- */
+thead tr:first-child th { top: 0; }
+thead tr:nth-child(2) th { top: var(--rm-row-height); }
+
+thead th.hd-group {
+  text-align: center;
+  background: var(--rm-versions-bg);
+  border-bottom-color: var(--rm-versions-border);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: var(--fontsize-label);
+}
+thead th.hd-group .cellpad { justify-content: center; }
+
+/* A stacked header: number over description, both centred on the narrow
+   quantity columns. */
+th .cellpad.cellpad--stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--scale-50);
+  width: 100%;
+  min-width: 0;
+  /* Taller than the one-line cell height, and it grows with the name:
+     these columns are narrow, so a long version name wraps rather than
+     being cut off. */
+  min-height: var(--rm-stack-height);
+  padding: var(--scale-200);
+  line-height: var(--line-height-label);
+}
+th .cellpad.cellpad--stack > * { max-width: 100%; min-width: 0; }
+/* The version's name over its quantities. It wraps rather than
+   truncating: these columns are narrow and the name is the only thing
+   telling them apart. */
+th .cellpad.cellpad--stack .hd-label {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  text-align: right;
+  line-height: var(--line-height-label);
+}
+th .cellpad.cellpad--stack .sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+thead th {
+  background: var(--rm-head-bg);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--fontsize-body-sm);
+  color: var(--text-primary);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-top: 1px solid var(--border-tertiary);
+  white-space: nowrap;
+}
+thead th:first-child { left: 0; z-index: 5; border-left: 1px solid var(--border-tertiary); }
+
+/* A hairline under the whole header, so the boundary stays crisp while
+   rows pass beneath it. */
+thead tr:last-child th { box-shadow: 0 1px 0 var(--border-default); }
+
+tbody th {
+  background: var(--rm-rowhead-bg);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  font-size: var(--fontsize-body-sm);
+  border-left: 1px solid var(--border-tertiary);
+}
+
+.cellpad {
+  padding: 0 var(--scale-200);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+th .cellpad {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-100);
+  height: var(--rm-cell-height);
+}
+
+/* ── Header interactions ───────────────────────────────────────
+   Row headers still click to select the row. Column headers do not
+   select: a movable one is the drag handle for reordering its
+   column, a pinned one (Calculated Quantity, and every quantity
+   column on the distribution list) is inert.
+   ------------------------------------------------------------- */
+.hd { user-select: none; }
+tbody th.hd { cursor: pointer; }
+tbody th.hd:hover { background: var(--rm-head-bg-hover); }
+
+thead th.hd-move { cursor: grab; }
+thead th.hd-move:hover { background: var(--rm-head-bg-hover); }
+thead th.hd-move:active { cursor: grabbing; }
+thead th.hd-pinned { cursor: default; }
+
+/* The dragged header fades; the drop target shows the edge the column
+   will land against. */
+thead th.is-dragging { opacity: .4; }
+thead th.drop-before::before,
+thead th.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--rm-sel-edge);
+  z-index: 4;
+}
+thead th.drop-before::before { left: 0; }
+thead th.drop-after::after { right: 0; }
+
+/* Six-dot grip. Its width is always reserved, so revealing it on hover
+   does not shift the column label. */
+.grip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  fill: currentColor;
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+thead th.hd-move:hover .grip { opacity: 1; }
+
+thead th.hd-sel, tbody th.hd-sel { background: var(--rm-head-bg-selected); }
+
+/* The name half of a header cell: takes the room the rename button and
+   the sub-label do not, and truncates rather than wrapping. */
+.hd-label { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+
+.sub {
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-light);
+  font-size: var(--fontsize-label);
+}
+
+/* Rename affordance, revealed on header hover. */
+.pencil {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: var(--scale-50);
+  margin: 0;
+  line-height: 0;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  opacity: 0;
+  flex: none;
+}
+th:hover .pencil { opacity: 1; }
+.pencil:hover { color: var(--interactive-pressed); background: var(--bg-surface); }
+.pencil:focus-visible { opacity: 1; outline: 2px solid var(--border-focus); outline-offset: 0; }
+
+/* Scope is stated in words in each header's sub-label, in the
+   inspector and in the field menu, so there is no chip component
+   here any more. What a cell's value is doing — inherited, set,
+   locked — is carried by the cell states below instead.
+   ------------------------------------------------------------- */
+
+/* ── Data cells ───────────────────────────────────────────────
+   Everything on the distribution list is typeable. Two read-only
+   states remain, both on the master ticket: the calculated quantity,
+   and a spec whose detail this ticket does not have.
+   ------------------------------------------------------------- */
+td.cell { cursor: cell; background: var(--bg-surface); }
+td.cell .val {
+  padding: 0 var(--scale-200);
+  height: var(--rm-cell-height);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+td.num .val { justify-content: flex-end; }
+td.empty .val::before { content: "—"; color: var(--border-subtle); }
+td.blank { background: var(--rm-blank-bg); cursor: default; }
+
+/* A quantity column is a version. Tinted with the accent the master
+   tickets use, so the version columns read as a group against the
+   shipping fields beside them — and an empty cell reads as "this
+   address is not getting this version". */
+td.qty { background: var(--rm-versions-bg); }
+td.qty .val { font-weight: var(--font-weight-semibold); }
+td.qty.empty .val { font-weight: var(--font-weight-light); }
+thead th.hd-qty { background: var(--rm-versions-bg); border-bottom-color: var(--rm-versions-border); }
+
+/* A spec whose detail does not exist on this master ticket. */
+td.missing { background: var(--bg-muted); cursor: default; }
+td.missing .val { color: var(--text-tertiary); font-style: italic; }
+
+/* A computed cell: read-only, rolled up from the distribution list. */
+/* Quantity Shipping: a roll-up of the distribution list, so it is
+   neither editable nor selectable. Job Description on a detail table is
+   the same kind of thing — it identifies the row, it is not edited
+   here — so it reads the same way. */
+td.derived,
+td.context { background: var(--bg-muted); cursor: default; user-select: none; }
+td.context .val { color: var(--text-secondary); }
+
+/* A field that does not apply to this row — Old Job Num on a New Job,
+   the field the JM modal collapses. Selectable, so it can be crossed
+   over and pasted past, but not editable. */
+td.na { background: var(--bg-muted); }
+td.na .val { color: var(--text-tertiary); font-style: italic; }
+td.derived .val { font-weight: var(--font-weight-semibold); color: var(--text-primary); }
+
+/* ── Selection ─────────────────────────────────────────────────
+   Tint on every cell in the range, a 2px edge on the four outer
+   sides (the e-* classes), and a fill handle on the bottom-right.
+   ------------------------------------------------------------- */
+td.sel { background: var(--rm-sel-bg); }
+
+td.qty.sel { background: var(--rm-versions-selected); }
+td.anchor { background: var(--bg-surface); }
+td.anchor.qty { background: var(--rm-versions-bg); }
+
+td.e-t { box-shadow: inset 0 2px 0 -0.5px var(--rm-sel-edge); }
+td.e-b { box-shadow: inset 0 -2px 0 -0.5px var(--rm-sel-edge); }
+td.e-l { box-shadow: inset 2px 0 0 -0.5px var(--rm-sel-edge); }
+td.e-r { box-shadow: inset -2px 0 0 -0.5px var(--rm-sel-edge); }
+td.e-t.e-l { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset 2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-t.e-r { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-b.e-l { box-shadow: inset 0 -2px 0 -.5px var(--rm-sel-edge), inset 2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-b.e-r { box-shadow: inset 0 -2px 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-t.e-b.e-l.e-r { box-shadow: inset 0 0 0 2px var(--rm-sel-edge); }
+td.e-t.e-l.e-r { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset 2px 0 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-b.e-l.e-r { box-shadow: inset 0 -2px 0 -.5px var(--rm-sel-edge), inset 2px 0 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-t.e-b.e-l { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset 0 -2px 0 -.5px var(--rm-sel-edge), inset 2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-t.e-b.e-r { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset 0 -2px 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.e-t.e-b { box-shadow: inset 0 2px 0 -.5px var(--rm-sel-edge), inset 0 -2px 0 -.5px var(--rm-sel-edge); }
+td.e-l.e-r { box-shadow: inset 2px 0 0 -.5px var(--rm-sel-edge), inset -2px 0 0 -.5px var(--rm-sel-edge); }
+td.fillpreview { box-shadow: inset 0 0 0 1px var(--interactive-pressed); }
+
+.handle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  right: -4px;
+  bottom: -4px;
+  background: var(--rm-sel-edge);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--scale-25);
+  cursor: crosshair;
+  z-index: 6;
+}
+
+/* ── Cell editor ───────────────────────────────────────────────
+   One input, mounted into the cell being edited (and reused for
+   inline header renames).
+   ------------------------------------------------------------- */
+.editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--interactive-default);
+  padding: 0 var(--scale-100);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  z-index: 7;
+  outline: none;
+}
+td.num .editor { text-align: right; }
+
+/* Typed text that is not one of the field's values. The cell refuses it
+   on commit; this is the warning while it is still being typed. */
+.editor--invalid { border-color: var(--rm-danger-text); }
+
+/* ── Type-ahead list ───────────────────────────────────────────
+   Under the cell being edited, on <body> because a cell clips its own
+   overflow. Same surface as the context menus.
+   ------------------------------------------------------------- */
+.ac {
+  position: fixed;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  padding: var(--scale-100);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-menu);
+  max-height: 220px;
+  overflow: auto;
+}
+.ac.open { display: flex; }
+.ac button {
+  appearance: none;
+  border: 0;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  padding: var(--scale-200) var(--scale-300);
+  border-radius: var(--border-radius-sm);
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.ac button:hover,
+.ac button.is-active { background: var(--interactive-bg-subtle); }
+
+/* ── Checkbox cell ─────────────────────────────────────────────
+   For Distribution. The control IS the cell, so there is no editor:
+   click it, or press Space or Enter on the selected cell.
+   ------------------------------------------------------------- */
+td.bool .val { display: flex; align-items: center; justify-content: center; height: 100%; }
+/* An unchecked box is not an empty cell — no em-dash placeholder. */
+td.bool.empty .val::before { content: none; }
+.cell-check {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--interactive-default);
+  cursor: pointer;
+}
+
+/* ── Add row / add column affordances ─────────────────────────── */
+td.add, th.add {
+  background: var(--interactive-bg-subtle);
+  color: var(--text-interactive);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+}
+td.add:hover, th.add:hover { background: color-mix(in srgb, var(--interactive-default) 14%, var(--bg-surface)); }
+th.add { position: sticky; top: 0; }
+tbody th.add { left: 0; }
+
+/* ══ Context menus ════════════════════════════════════════════
+   Right-click on a cell or header, and the two add-menus. Built by
+   menu() and positioned against the viewport.
+   ───────────────────────────────────────────────────────────── */
+.menu {
+  position: fixed;
+  z-index: 50;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-menu);
+  padding: var(--scale-100);
+  min-width: 210px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  padding: var(--scale-100) var(--scale-200);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.menu button:hover { background: var(--interactive-bg-subtle); }
+.menu button.danger { color: var(--rm-danger-text); }
+.menu button.danger:hover { background: var(--rm-danger-bg); }
+.menu .mlabel {
+  padding: var(--scale-100) var(--scale-200) var(--scale-50);
+  color: var(--text-secondary);
+  font-size: var(--fontsize-label);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: var(--font-weight-semibold);
+}
+.menu hr { border: 0; border-top: 1px solid var(--border-tertiary); margin: var(--scale-100) 0; }
+.menu .mnote--inline { padding: var(--scale-50) 0 0; }
+.menu .mnote {
+  padding: var(--scale-50) var(--scale-200) var(--scale-200);
+  color: var(--text-tertiary);
+  font-size: var(--fontsize-label);
+  line-height: var(--line-height-body-sm);
+}
+
+/* ══ Toast ════════════════════════════════════════════════════
+   Bottom-center, with an inline Undo. Deliberately not the shared
+   top-right toast component: every message here is paired with an
+   undo for the action just taken, so it sits near the grid rather
+   than in the corner.
+   ───────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--scale-1600);
+  transform: translateX(-50%);
+  background: var(--bg-inverse);
+  color: var(--text-on-dark);
+  padding: var(--scale-200) var(--scale-300);
+  border-radius: var(--border-radius-md);
+  z-index: 60;
+  font-size: var(--fontsize-body-sm);
+  box-shadow: var(--shadow-menu);
+  display: flex;
+  gap: var(--scale-300);
+  align-items: center;
+}
+.toast button {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--rm-toast-action);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: rise .16s ease-out; }
+  @keyframes rise {
+    from { opacity: 0; transform: translate(-50%, 6px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+}

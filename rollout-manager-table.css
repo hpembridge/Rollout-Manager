@@ -1,0 +1,527 @@
+/* ============================================================
+   Rollout Manager (table version) — page styles
+   ------------------------------------------------------------
+   Built on the shared design system: shared/css/design-tokens.css
+   supplies every color, type, space and radius value, plus the
+   shared .btn-*, .tab-btn, .icon-btn and .type-* recipes this file
+   extends. No primitives are referenced below the LOCAL TOKENS
+   block.
+
+   Component order matches the markup:
+     Local tokens → App shell → Topbar → Tabs → Panels
+     → Data table → Address table → Footer → Modal extras → Toast
+   ============================================================ */
+
+/* ── Local tokens ──────────────────────────────────────────────
+   Gaps in design-tokens.css, plus table geometry off the 4px
+   scale. Candidates for the Figma collection:
+     --shadow-panel    (built like the existing --overlay-* tokens)
+     --duration-fast   (no motion tokens in the system yet)
+   ------------------------------------------------------------- */
+:root {
+  --shadow-panel: 0 4px 16px rgb(from var(--color-black) r g b / .12);
+  --duration-fast: .15s;
+
+  /* Row height that fits a three-line address without the shipping
+     fields floating: set by the address block, not the scale. */
+  --rmt-row-height: 64px;
+  /* A quantity column holds at most five digits. */
+  --rmt-qty-width: 96px;
+  --rmt-addr-width: 300px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.hidden-section { display: none !important; }
+html { height: 100%; }
+
+/* ── App shell ─────────────────────────────────────────────────
+   The shared sidebar component inserts its <aside> as body's first
+   child, so body itself is the app shell flex row.
+   ------------------------------------------------------------- */
+body {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family-primary);
+  font-size: var(--fontsize-body-sm);
+  line-height: var(--line-height-body-sm);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Full width: the address table is wide by nature, so nothing here is
+   capped at a container width. The wrapper stays so a measure can be
+   put back in one place. The shared breadcrumb component ships at
+   workspace width and is widened to match. */
+.page-width { width: 100%; }
+.breadcrumbs { max-width: none; }
+
+.page-scroll { flex: 1; overflow-y: auto; padding: var(--scale-600) var(--scale-800) var(--scale-800); }
+
+/* ══ Topbar ═══════════════════════════════════════════════════ */
+.rollout-topbar {
+  padding: var(--scale-200) var(--scale-800);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-tertiary);
+  flex: none;
+}
+.rollout-topbar__inner { display: flex; align-items: center; gap: var(--scale-400); }
+.rollout-title { font-weight: var(--font-weight-semibold); font-size: var(--fontsize-body-md); white-space: nowrap; }
+.rollout-title__sub { color: var(--text-tertiary); font-weight: var(--font-weight-light); }
+.topbar-spacer { flex: 1; }
+
+/* ══ View tabs ════════════════════════════════════════════════
+   The button is .tab-btn from design-tokens.css; only the row is
+   local, same as .tab-row on the inventory item page.
+   ───────────────────────────────────────────────────────────── */
+.rollout-tabs { flex: none; padding: var(--scale-400) var(--scale-800) 0; background: var(--bg-surface); }
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--scale-300);
+  padding-bottom: var(--scale-400);
+}
+.tab-row .tab-btn { min-width: fit-content; }
+
+/* ══ Panels ═══════════════════════════════════════════════════ */
+.panel-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--scale-600);
+}
+/* A card whose own content supplies the padding — a flush table. */
+.panel-card.is-flush { padding: 0; overflow: hidden; }
+
+/* ── "Add" affordance ──────────────────────────────────────────
+   The house pattern: a full-width, info-tinted row under the list
+   it adds to. Same recipe as Add Item / Add Unit Type in the
+   inventory prototype.
+   ------------------------------------------------------------- */
+.add-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--scale-1100);
+  margin-top: var(--scale-400);
+  padding: 0 var(--scale-400);
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--border-radius-md);
+  background: var(--status-info-bg);
+  color: var(--interactive-default);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.add-row:hover { background: var(--interactive-bg-subtle); }
+.add-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.add-row__icon { margin-right: var(--scale-200); }
+
+/* ══ Data table ═══════════════════════════════════════════════
+   The house table: uppercase headers, centred by default, .left
+   where text reads better ranged left.
+   ───────────────────────────────────────────────────────────── */
+table.data { width: 100%; border-collapse: collapse; }
+
+table.data th {
+  height: var(--scale-1200);
+  padding: 0 var(--scale-300);
+  font-size: var(--fontsize-label);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-tertiary);
+  background: var(--bg-surface);
+}
+table.data td {
+  height: var(--rmt-row-height);
+  padding: 0 var(--scale-200);
+  text-align: center;
+  border-bottom: 1px solid var(--border-tertiary);
+  vertical-align: middle;
+}
+table.data th.left, table.data td.left { text-align: left; }
+
+/* Edge gutters: the first and last columns keep clear of the card's
+   sides rather than running into them. */
+table.data th:first-child, table.data td:first-child { padding-left: var(--scale-600); }
+.dist-table th.col-cb, .dist-table td.col-cb { padding-left: 0; }
+table.data th:last-child, table.data td:last-child { padding-right: var(--scale-600); }
+table.data th.num, table.data td.num { text-align: right; }
+table.data tbody tr:hover { background: var(--bg-muted); }
+
+/* Sortable header — the whole cell is the target, so the button
+   fills it and inherits the header's own type. */
+table.data th:has(.th-sort) { padding: 0; }
+.th-sort {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--scale-100);
+  padding: 0 var(--scale-300);
+  background: none;
+  border: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--duration-fast);
+}
+table.data th.left .th-sort { justify-content: flex-start; }
+.th-sort:hover { color: var(--text-primary); }
+.th-sort:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.th-sort i { opacity: .45; }
+th[aria-sort] .th-sort { color: var(--text-interactive); }
+th[aria-sort] .th-sort i { opacity: 1; }
+
+/* A job's header stacks its number over its description, so the
+   quantity column stays as narrow as the numbers in it. */
+.th-sort--stack {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: var(--scale-200) var(--scale-200);
+  line-height: var(--line-height-label);
+}
+.th-sort--stack .job-desc {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: var(--font-weight-light);
+  color: var(--text-tertiary);
+}
+/* The sort chevron is pinned inside the button, not the cell: the
+   header cells are sticky, so they cannot take position:relative. */
+.th-sort--stack { position: relative; }
+.th-sort--stack i { position: absolute; right: 0; top: var(--scale-100); }
+
+/* ── Click-in cell field ───────────────────────────────────────
+   The inventory recipe: a value at rest reads as text and only
+   looks like a field once the row is hovered or it has focus.
+   ------------------------------------------------------------- */
+.cell-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  height: var(--scale-800);
+  padding: 0 var(--scale-200);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+  font-weight: inherit;
+  text-align: inherit;
+  appearance: none;
+  transition: border-color 90ms linear, background-color 90ms linear;
+}
+.cell-field.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.cell-field::placeholder { color: var(--text-tertiary); }
+
+/* The row is the unit of discovery: hovering it outlines every
+   field in it at once; the one under the pointer takes the
+   stronger edge. */
+table.data tbody tr:hover .cell-field:not(:focus) {
+  border-color: var(--border-tertiary);
+  background: var(--bg-surface);
+}
+table.data tbody tr:hover .cell-field:hover:not(:focus) { border-color: var(--border-subtle); }
+.cell-field:focus {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+  outline: 2px solid var(--border-focus);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) { .cell-field { transition: none; } }
+
+/* ══ Address table ════════════════════════════════════════════ */
+.search-list-header {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-200);
+  padding: var(--scale-300) var(--scale-400);
+  border-bottom: 1px solid var(--border-tertiary);
+}
+.search-input {
+  flex: 1;
+  height: var(--scale-800);
+  padding: 0 var(--scale-300);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+}
+.search-input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
+.search-input::placeholder { color: var(--text-tertiary); }
+
+.table-wrap { overflow: auto; max-height: 62vh; }
+.dist-table { table-layout: auto; }
+.dist-table thead th { position: sticky; z-index: 2; }
+.dist-table thead tr:first-child th { top: 0; }
+.dist-table thead tr:nth-child(2) th { top: var(--scale-1200); }
+/* A hairline under the whole header, so a part-scrolled row clearly
+   passes beneath it rather than looking cut off. */
+.dist-table thead tr:nth-child(2) th,
+.dist-table thead tr:first-child th[rowspan] { box-shadow: 0 1px 0 var(--border-default); }
+
+/* ── Checkbox column ───────────────────────────────────────────
+   The label fills the whole cell, so the click target is the column,
+   not the 16px box inside it. The column is wide enough to keep that
+   target clear of the address beside it.
+   ------------------------------------------------------------- */
+/* The label is absolutely positioned, so the cell has no content to
+   size from: the width has to be held open explicitly. Only the body
+   cell takes position:relative — the header cell has to stay sticky,
+   and position:relative would quietly cancel that. */
+.dist-table th.col-cb, .dist-table td.col-cb {
+  width: 68px;
+  min-width: 68px;
+  padding: 0;
+}
+.dist-table td.col-cb { position: relative; }
+/* In the header the label is a plain flex box filling the cell. */
+.dist-table th.col-cb .cb-cell-label { position: static; height: 100%; }
+/* The label fills the cell so the whole column is the target, and its
+   own padding is what holds the box off the table edge and off the
+   address beside it. */
+.cb-cell-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 var(--scale-400) 0 var(--scale-600);
+  cursor: pointer;
+}
+.cb-cell-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--interactive-default);
+}
+.cb-cell-label:hover input { outline: 2px solid var(--border-subtle); outline-offset: 2px; }
+.cb-cell-label input:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.dist-table .col-addr { width: var(--rmt-addr-width); min-width: var(--rmt-addr-width); }
+.dist-table .col-qty { width: var(--rmt-qty-width); min-width: var(--rmt-qty-width); }
+.dist-table .col-ship { min-width: 150px; }
+/* Account holds "Customer Account (648328494)" without truncating. */
+.dist-table th.col-account, .dist-table td.col-account { min-width: 215px; }
+.dist-table .col-notes { min-width: 190px; }
+.dist-table .col-actions { width: 48px; }
+
+/* The quantity columns are one group: tinted together and labelled
+   once, so they read as a block against the shipping fields. */
+.dist-table th.col-qty-group {
+  background: var(--accent-bg);
+  border-bottom-color: color-mix(in srgb, var(--accent-default) 45%, var(--bg-surface));
+}
+.dist-table th.col-qty { background: var(--accent-bg); }
+.dist-table td.col-qty { background: color-mix(in srgb, var(--accent-bg) 55%, var(--bg-surface)); }
+.dist-table tbody tr:hover td.col-qty { background: var(--accent-bg); }
+
+/* ── Address cell ──────────────────────────────────────────────
+   The location name with its rollout code beside it, then city and
+   street under it — the shipping tab's stacked address, with the
+   code in the position the name badge occupies there.
+   ------------------------------------------------------------- */
+.col-addr { padding: var(--scale-300) var(--scale-400) var(--scale-300) var(--scale-200); }
+.addr-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-200);
+  min-width: 0;
+  margin-bottom: var(--scale-100);
+}
+.addr-name {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--fontsize-body-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.addr-code {
+  flex: none;
+  padding: 0 var(--scale-100);
+  border: 1px solid var(--status-neutral-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--status-neutral-bg);
+  color: var(--text-secondary);
+  font-size: var(--fontsize-label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.addr-city, .addr-street {
+  display: block;
+  font-size: var(--fontsize-body-sm);
+  line-height: var(--line-height-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.addr-city { color: var(--text-secondary); }
+.addr-street { color: var(--text-tertiary); font-size: var(--fontsize-label); margin-top: var(--scale-50); }
+
+.job-no { font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.master-row .job-no { color: var(--text-interactive); font-weight: var(--font-weight-semibold); }
+#masterTable .col-job { width: 120px; }
+#masterTable .col-desc { width: 230px; }
+
+/* A selected row keeps its tint while the pointer is elsewhere. */
+.dist-table tbody tr.is-selected,
+.dist-table tbody tr.is-selected td.col-qty { background: var(--interactive-bg-subtle); }
+
+.row-hidden { display: none; }
+
+.row-remove { color: var(--text-tertiary); }
+.row-remove:hover { color: var(--color-copper-600); }
+
+/* Totals row: the same figure the master ticket calls Calculated
+   Quantity, under its column. */
+.dist-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-muted);
+  border-top: 1px solid var(--border-default);
+  font-weight: var(--font-weight-semibold);
+  height: var(--scale-1000);
+}
+.total-label { text-transform: uppercase; letter-spacing: .06em; font-size: var(--fontsize-label); color: var(--text-tertiary); }
+.total-cell { font-weight: var(--font-weight-semibold); }
+
+/* ══ List footer ══════════════════════════════════════════════ */
+.list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--scale-300);
+  padding: var(--scale-200) var(--scale-400);
+  border-top: 1px solid var(--border-tertiary);
+}
+.list-footer-left { display: flex; align-items: center; gap: var(--scale-300); }
+.list-footer-count {
+  font-size: var(--fontsize-label);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.list-footer-left.multi-select .list-footer-count { color: var(--text-interactive); }
+.list-footer-right { display: flex; align-items: center; gap: var(--scale-100); }
+
+/* Selection actions only exist while something is selected. */
+.selection-actions { display: none; align-items: center; gap: var(--scale-100); }
+.list-footer-left.multi-select .selection-actions { display: flex; }
+.inline-icon-btn {
+  width: var(--scale-600);
+  height: var(--scale-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.inline-icon-btn:hover { background: var(--bg-muted); color: var(--text-primary); border-color: var(--border-subtle); }
+
+/* ══ Modal extras ═════════════════════════════════════════════
+   modal-shell.css carries the overlay, panel, header and footer.
+   These are the few pieces this prototype adds.
+   ───────────────────────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; }
+.form-label {
+  font-size: var(--fontsize-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: var(--scale-100);
+}
+.form-input, .form-select {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: var(--scale-200) var(--scale-300);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.form-input:focus, .form-select:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
+.form-input::placeholder { color: var(--text-tertiary); }
+.form-select { cursor: pointer; }
+.form-row { display: grid; gap: var(--scale-400); }
+.form-row-2 { grid-template-columns: 1fr 1fr; }
+.form-hint, .modal-note { color: var(--text-tertiary); margin: var(--scale-100) 0 0; }
+.modal-note { margin: 0; }
+.btn-primary.is-danger { background: var(--color-copper-600); }
+.btn-primary.is-danger:hover { background: var(--color-copper-500); }
+
+/* ══ Toast ════════════════════════════════════════════════════
+   Transient feedback for a bulk action, with an inline undo.
+   ───────────────────────────────────────────────────────────── */
+.toast-host {
+  position: fixed;
+  bottom: var(--scale-600);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-200);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-300);
+  padding: var(--scale-200) var(--scale-300);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-inverse);
+  color: var(--text-on-dark);
+  box-shadow: var(--shadow-panel);
+  font-size: var(--fontsize-body-sm);
+  pointer-events: auto;
+}
+.toast-action {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-patina-200);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
