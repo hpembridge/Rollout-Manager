@@ -36,8 +36,6 @@
   /* Grid geometry. Row height is set by the 28px cell plus its 1px
      rule, so it does not land on the spacing scale. */
   --rm-cell-height: 28px;
-  /* A stacked two-line header — number over description, with padding. */
-  --rm-stack-height: 52px;
   --rm-row-height: 29px;
   /* The master ticket tables put only the job number in the row head. */
   --rm-rowhead-width: 150px;
@@ -50,12 +48,6 @@
   --rm-rowhead-bg: var(--bg-muted);
   --rm-blank-bg: var(--bg-muted);
 
-  /* Versions row — the accent (gold) family, so it reads as a
-     different kind of row from the data grid. */
-  --rm-versions-bg: var(--accent-bg);
-  --rm-versions-border: color-mix(in srgb, var(--accent-default) 45%, var(--bg-surface));
-  --rm-versions-ink: var(--accent-strong);
-  --rm-versions-selected: color-mix(in srgb, var(--accent-default) 28%, var(--accent-bg));
 
   /* Selection tints. */
   --rm-sel-bg: var(--interactive-bg-subtle);
@@ -107,8 +99,7 @@ body {
 .breadcrumbs { max-width: none; }
 
 /* ══ Topbar ═══════════════════════════════════════════════════
-   Rollout name, the two view tabs, the version picker (distribution
-   view only) and the history controls.
+   Rollout name and the two rollout outputs.
    ───────────────────────────────────────────────────────────── */
 .rollout-topbar {
   padding: var(--scale-200) var(--scale-800);
@@ -120,6 +111,15 @@ body {
   display: flex;
   align-items: center;
   gap: var(--scale-400);
+}
+
+/* Back to the dashboard, then a hairline before the rollout name. */
+.rollout-back { padding-inline: 0; text-decoration: none; }
+.rollout-topbar__divider {
+  align-self: stretch;
+  width: 1px;
+  margin-block: var(--scale-100);
+  background: var(--border-tertiary);
 }
 
 .rollout-title {
@@ -138,7 +138,7 @@ body {
 /* ══ View tabs ════════════════════════════════════════════════
    The button is .tab-btn from design-tokens.css, unchanged. Only the
    row is local — same arrangement as .tab-row on the inventory item
-   page, capped so two tabs do not stretch the full data width.
+   page: Master tickets, Shipping, Distribution.
    ───────────────────────────────────────────────────────────── */
 .rollout-tabs {
   flex: none;
@@ -151,6 +151,357 @@ body {
   gap: var(--scale-300);
 }
 .tab-row .tab-btn { min-width: fit-content; }
+
+/* ══ Overview ═════════════════════════════════════════════════
+   The Overview tab: cards on the page background. The page itself
+   does not scroll — the timeline and details hold still and only
+   the product cards scroll, inside their own card. On a short or
+   narrow window it falls back to the whole tab scrolling. The
+   `.overview table` resets undo this file's global grid table rules.
+   ───────────────────────────────────────────────────────────── */
+.overview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 var(--scale-800) var(--scale-800);
+}
+.overview[hidden] { display: none; }
+.overview__inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-400);
+}
+.overview__inner > .overview-card { flex: none; }
+
+.overview-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: var(--scale-400) var(--scale-500) var(--scale-500);
+}
+.overview-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-300);
+  margin-bottom: var(--scale-400);
+}
+.overview-card__title {
+  margin: 0;
+  font-size: var(--fontsize-body-lg);
+  line-height: var(--line-height-body-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.overview-card__sub { color: var(--text-tertiary); }
+
+/* ── Details ───────────────────────────────────────────────── */
+/* Details beside products: a fixed-width column on the left, the
+   product table taking the rest. Stacks on narrow screens. */
+.overview__split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--container-sidebar-sm) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--scale-400);
+}
+/* Details keeps its height; if the window is shorter, it scrolls. */
+.overview__split > .overview-details { align-self: start; max-height: 100%; overflow-y: auto; }
+
+/* Narrow or short windows: one column and the whole tab scrolls. */
+@media (max-width: 1100px), (max-height: 720px) {
+  .overview { overflow-y: auto; }
+  .overview__inner, .overview__split { flex: none; }
+  .overview__split { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .overview-products .product-cards { overflow: visible; }
+}
+@media (min-width: 1101px) and (max-height: 720px) {
+  .overview__split { grid-template-columns: var(--container-sidebar-sm) minmax(0, 1fr); }
+}
+
+/* One item per line, label over value. */
+.detail-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--scale-300);
+  margin: 0;
+}
+.detail-list__item { display: flex; flex-direction: column; gap: var(--scale-50); min-width: 0; }
+.detail-list__label { color: var(--text-tertiary); font-size: var(--fontsize-label); }
+.detail-list__value {
+  margin: 0;
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Editable detail fields ────────────────────────────────────
+   The inventory cell-field treatment on the details: reads as the
+   value at rest, outlined on hover, a real field on focus.
+   ------------------------------------------------------------- */
+.detail-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--scale-800);
+  margin: 0 calc(-1 * var(--scale-200));
+  padding: 0 var(--scale-200);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-md);
+  font-weight: var(--font-weight-medium);
+  appearance: none;
+  transition: border-color 90ms linear, background-color 90ms linear;
+}
+.detail-field--select { cursor: pointer; }
+.detail-field:hover:not(:focus) { border-color: var(--border-subtle); background: var(--bg-surface); }
+.detail-field:focus {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+  outline: 2px solid var(--border-focus);
+  outline-offset: -1px;
+}
+/* Sales is read, not typed — it follows the customer. */
+.detail-list__value--derived { display: flex; align-items: center; min-height: var(--scale-800); }
+.detail-list__value .is-missing { color: var(--text-tertiary); font-weight: var(--font-weight-light); }
+
+/* ── Timeline sheet ────────────────────────────────────────────
+   Milestones across, Target / Actual / Status down. The date cells
+   are .cell-field inputs, same as the inventory unit rows.
+   ------------------------------------------------------------- */
+.ov-timeline__scroller {
+  overflow-x: auto;
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-sm);
+}
+/* Every milestone column is the same width, whatever is in it:
+   fixed layout shares the width left after the row heads equally,
+   and content wraps down instead of pushing a column wider. Below
+   the minimum the sheet scrolls sideways inside its scroller. */
+.overview .ov-timeline {
+  width: 100%;
+  min-width: calc(88px + 10 * 112px);
+  table-layout: fixed;
+}
+.ov-timeline__col-head { width: 88px; }
+.overview .ov-timeline th,
+.overview .ov-timeline td {
+  border-right: 1px solid var(--border-tertiary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.overview .ov-timeline th:last-child,
+.overview .ov-timeline td:last-child { border-right: 0; }
+.overview .ov-timeline tbody tr:last-child > * { border-bottom: 0; }
+.overview .ov-timeline .group-start { border-left: 1px solid var(--border-default); }
+.overview .ov-timeline thead th { background: var(--bg-subtle); color: var(--text-primary); }
+.overview .ov-timeline .ov-timeline__group { font-weight: var(--font-weight-semibold); }
+.ov-timeline__owner { color: var(--text-tertiary); font-weight: var(--font-weight-light); margin-left: var(--scale-100); }
+.overview .ov-timeline .ov-timeline__milestone { font-weight: var(--font-weight-medium); white-space: normal; }
+.overview .ov-timeline .ov-timeline__corner,
+.overview .ov-timeline .ov-timeline__rowhead {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+}
+.overview .ov-timeline td.ov-timeline__cell { padding: var(--scale-100); }
+.overview .ov-timeline .ov-timeline__status { color: var(--text-secondary); }
+.ov-timeline__status .status-dot { vertical-align: middle; margin-right: var(--scale-50); }
+/* Late and due are filled like the dashboard cells. Text stays
+   primary: the only red text token is reserved for rejected input. */
+.overview .ov-timeline .ov-timeline__status.is-late { background: var(--status-error-bg); color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+.overview .ov-timeline .ov-timeline__status.is-due  { background: var(--status-warning-bg); color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+
+.cell-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  height: var(--scale-700);
+  padding: 0 var(--scale-100);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  transition: border-color 90ms linear, background-color 90ms linear;
+}
+.cell-field.is-empty:not(:focus) { color: var(--text-tertiary); }
+.cell-field::placeholder { color: var(--text-tertiary); }
+/* A note wraps inside its cell and the field grows with it
+   (field-sizing: content — where it is not supported the field keeps
+   one line and scrolls). The row grows to the longest note. */
+.cell-field--note {
+  display: block;
+  field-sizing: content;
+  height: auto;
+  min-height: var(--scale-700);
+  max-height: 8lh;
+  padding-block: var(--scale-100);
+  line-height: var(--line-height-label);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+.overview .ov-timeline td.ov-timeline__cell--note,
+.overview .ov-timeline .ov-timeline__row--note > th { vertical-align: top; }
+.cell-field::-webkit-calendar-picker-indicator { opacity: 0; cursor: pointer; margin-left: 0; }
+.ov-timeline tr:hover .cell-field::-webkit-calendar-picker-indicator,
+.cell-field:focus::-webkit-calendar-picker-indicator { opacity: .6; }
+.ov-timeline tr:hover .cell-field:not(:focus) { border-color: var(--border-tertiary); background: var(--bg-surface); }
+.ov-timeline tr:hover .cell-field:hover:not(:focus) { border-color: var(--border-subtle); }
+.cell-field:focus {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+  outline: 2px solid var(--border-focus);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell-field, .detail-field { transition: none; }
+}
+
+/* ── Products ─────────────────────────────────────────────────── */
+.overview table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+  border-collapse: collapse;
+  background: none;
+}
+.overview table th,
+.overview table td {
+  position: static;
+  height: auto;
+  overflow: visible;
+  padding: var(--scale-200) var(--scale-300);
+  border: 0;
+  border-bottom: 1px solid var(--border-tertiary);
+  font-size: var(--fontsize-body-sm);
+  text-align: left;
+  white-space: nowrap;
+}
+.overview table thead th {
+  position: static;
+  box-shadow: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-semibold);
+}
+/* The grid's first-column rule (thead th:first-child, tbody th) has
+   the same specificity as the reset above and comes later. */
+.overview table th:first-child,
+.overview table td:first-child { border-left: 0; box-shadow: none; }
+
+/* ── Product cards ─────────────────────────────────────────────
+   A wrapping grid of cards, one per product: name and job, total
+   and counts, then one line per version. The card list is the one
+   thing on the Overview that scrolls.
+   ------------------------------------------------------------- */
+/* As tall as its cards, no taller. Only when the cards outgrow the
+   space left on screen does the card cap there and scroll inside. */
+.overview-products {
+  align-self: start;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.overview-products .overview-card__head { flex: none; }
+.product-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: var(--scale-300);
+  padding-bottom: var(--scale-500);
+}
+
+/* The card is a <details>; its summary is the card at rest. */
+.product-card {
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-surface);
+}
+.product-card[open] { border-color: var(--border-subtle); }
+
+.product-card__summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--scale-300);
+  padding: var(--scale-300);
+  list-style: none;
+  cursor: pointer;
+}
+.product-card__summary::-webkit-details-marker { display: none; }
+.product-card__summary:hover { background: var(--bg-muted); }
+.product-card__summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.product-card--single .product-card__summary { cursor: default; }
+.product-card--single .product-card__summary:hover { background: none; }
+
+.product-card__identity { display: flex; flex-direction: column; gap: var(--scale-50); min-width: 0; }
+.product-card__name {
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-semibold);
+}
+.product-card__job { color: var(--text-tertiary); }
+
+.product-card__figures {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-300);
+}
+.product-card__meta { color: var(--text-tertiary); }
+.product-card__qty { font-weight: var(--font-weight-semibold); }
+.product-card__chevron {
+  width: var(--scale-300);
+  color: var(--text-tertiary);
+  font-size: var(--fontsize-label);
+  transition: transform .15s ease;
+}
+.product-card[open] .product-card__chevron { transform: rotate(180deg); }
+/* Nothing to open, but the space is kept so figures line up. */
+.product-card--single .product-card__chevron { visibility: hidden; }
+
+.product-card__versions {
+  list-style: none;
+  margin: 0;
+  padding: var(--scale-200) var(--scale-300) var(--scale-300);
+  border-top: 1px solid var(--border-tertiary);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  column-gap: var(--scale-400);
+  row-gap: var(--scale-100);
+}
+/* Each line's four parts sit in the list's columns, so versions line
+   up down the card. */
+.version-line { display: contents; }
+/* Version names wrap rather than truncate. */
+.version-line__name { min-width: 0; overflow-wrap: anywhere; }
+.version-line__job,
+.version-line__locs { color: var(--text-tertiary); text-align: right; }
+.version-line__qty { text-align: right; font-weight: var(--font-weight-medium); }
+/* Addresses on a multi-version ticket with no version yet. */
+.version-line--missing > * { color: var(--text-primary); font-style: italic; background: var(--status-warning-bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card__chevron { transition: none; }
+}
 
 /* ══ Grid ═════════════════════════════════════════════════════
    A view is a list of tables, each in its own .grid-section. Built by
@@ -247,51 +598,12 @@ th, td {
 thead tr:first-child th { top: 0; }
 thead tr:nth-child(2) th { top: var(--rm-row-height); }
 
-thead th.hd-group {
-  text-align: center;
-  background: var(--rm-versions-bg);
-  border-bottom-color: var(--rm-versions-border);
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  font-size: var(--fontsize-label);
-}
-thead th.hd-group .cellpad { justify-content: center; }
-
-/* A stacked header: number over description, both centred on the narrow
-   quantity columns. */
-th .cellpad.cellpad--stack {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
-  gap: var(--scale-50);
-  width: 100%;
-  min-width: 0;
-  /* Taller than the one-line cell height, and it grows with the name:
-     these columns are narrow, so a long version name wraps rather than
-     being cut off. */
-  min-height: var(--rm-stack-height);
-  padding: var(--scale-200);
-  line-height: var(--line-height-label);
-}
-th .cellpad.cellpad--stack > * { max-width: 100%; min-width: 0; }
-/* The version's name over its quantities. It wraps rather than
-   truncating: these columns are narrow and the name is the only thing
-   telling them apart. */
-th .cellpad.cellpad--stack .hd-label {
-  flex: none;
-  font-variant-numeric: tabular-nums;
-  white-space: normal;
-  text-align: right;
-  line-height: var(--line-height-label);
-}
-th .cellpad.cellpad--stack .sub {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* The group header is a normal header cell (thead th), just spanning
+   its ticket's columns. */
+thead th.hd-group { text-align: left; }
+/* A numeric column's label sits over its numbers. */
+thead th.hd-num .cellpad { justify-content: flex-end; }
+thead th.hd-num .hd-label { flex: none; }
 
 thead th {
   background: var(--rm-head-bg);
@@ -432,14 +744,22 @@ td.num .val { justify-content: flex-end; }
 td.empty .val::before { content: "—"; color: var(--border-subtle); }
 td.blank { background: var(--rm-blank-bg); cursor: default; }
 
-/* A quantity column is a version. Tinted with the accent the master
-   tickets use, so the version columns read as a group against the
-   shipping fields beside them — and an empty cell reads as "this
-   address is not getting this version". */
-td.qty { background: var(--rm-versions-bg); }
-td.qty .val { font-weight: var(--font-weight-semibold); }
-td.qty.empty .val { font-weight: var(--font-weight-light); }
-thead th.hd-qty { background: var(--rm-versions-bg); border-bottom-color: var(--rm-versions-border); }
+/* Quantity and Version cells on the distribution use the standard cell
+   styling; an empty quantity (the em-dash) reads as "this address is
+   not getting this ticket". */
+
+/* A quantity with no version on a multi-version ticket — half an entry. */
+td.flag { background: var(--status-warning-bg); }
+td.flag.empty .val::before {
+  content: "Needs version";
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* The last column of each master ticket's group on the distribution,
+   so one ticket's pair is told apart from the next. */
+td.group-end,
+th.group-end { border-right-color: var(--border-default); }
 
 /* A spec whose detail does not exist on this master ticket. */
 td.missing { background: var(--bg-muted); cursor: default; }
@@ -467,9 +787,8 @@ td.derived .val { font-weight: var(--font-weight-semibold); color: var(--text-pr
    ------------------------------------------------------------- */
 td.sel { background: var(--rm-sel-bg); }
 
-td.qty.sel { background: var(--rm-versions-selected); }
 td.anchor { background: var(--bg-surface); }
-td.anchor.qty { background: var(--rm-versions-bg); }
+td.anchor.flag { background: var(--status-warning-bg); }
 
 td.e-t { box-shadow: inset 0 2px 0 -0.5px var(--rm-sel-edge); }
 td.e-b { box-shadow: inset 0 -2px 0 -0.5px var(--rm-sel-edge); }
@@ -573,6 +892,62 @@ td.bool.empty .val::before { content: none; }
   cursor: pointer;
 }
 
+/* ── Versions cell (.tier-*) ─────────────────────────────────────────────────
+   The Versions column on the master tickets table: chips on the shared
+   .pill, an add button, and a .pill-warn while addresses need a version.
+   Markup is tierCellTemplate / tierChipTemplate.
+   ------------------------------------------------------------- */
+.tier-cell { gap: var(--scale-100); }
+.tier-cell__chips {
+  display: flex;
+  gap: var(--scale-100);
+  min-width: 0;
+  overflow: hidden;
+}
+.tier-chip,
+.tier-missing {
+  flex: none;
+  font-family: inherit;
+  line-height: var(--line-height-label);
+  padding-block: var(--scale-25);
+  cursor: pointer;
+}
+.tier-chip__name { font-weight: var(--font-weight-medium); }
+.tier-chip__count {
+  color: var(--text-tertiary);
+  font-size: var(--fontsize-label);
+}
+.tier-chip:hover {
+  background: var(--interactive-bg-subtle);
+  border-color: var(--interactive-default);
+}
+.tier-chip:focus-visible,
+.tier-add:focus-visible,
+.tier-missing:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+
+.tier-add {
+  flex: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--scale-500);
+  height: var(--scale-500);
+  padding: 0;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--border-radius-full);
+  background: none;
+  color: var(--text-interactive);
+  font-size: var(--fontsize-label);
+  cursor: pointer;
+}
+.tier-add:hover {
+  border-style: solid;
+  border-color: var(--interactive-default);
+  background: var(--interactive-bg-subtle);
+}
+.tier-missing { white-space: nowrap; color: var(--text-primary); }
+
 /* ── Add row / add column affordances ─────────────────────────── */
 td.add, th.add {
   background: var(--interactive-bg-subtle);
@@ -673,3 +1048,14 @@ tbody th.add { left: 0; }
     to   { opacity: 1; transform: translate(-50%, 0); }
   }
 }
+
+/* ── Utilities ─────────────────────────────────────────────── */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+

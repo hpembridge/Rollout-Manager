@@ -9,9 +9,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
+    <link rel="stylesheet" href="components/status-dot/status-dot.css" />
     <link rel="stylesheet" href="rollout-manager.css" />
     <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
+    <!-- Seed rollouts. Each registers itself in window.ROLLOUTS by id;
+         ?rollout=<id> picks one (the dashboard links here that way), and
+         with no id the first one loads. -->
+    <script src="rollout-data-puttshack.js"></script>
+    <script src="rollout-data-famous-daves.js"></script>
     <script src="rollout-data.js"></script>
+    <script>
+      (function(){
+        const all = window.ROLLOUTS || {};
+        const id = new URLSearchParams(location.search).get("rollout");
+        window.ROLLOUT_DATA = all[id] || Object.values(all)[0];
+      })();
+    </script>
+    <!-- Customer / CSR lookups for the Overview details. -->
+    <script src="rollout-customers.js"></script>
+    <!-- Milestone status rules, shared with the dashboard. -->
+    <script src="rollout-status.js"></script>
     <script>
       window.SIDEBAR_CONFIG = {
         activeItem: 'Jobs',
@@ -29,17 +46,22 @@
         <nav class="breadcrumbs">
           <a class="crumb" href="#"><i class="fa-regular fa-folder"></i> Jobs</a>
           <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
-          <a class="crumb" href="#">Rollout Manager</a>
+          <a class="crumb" href="rollout-dashboard.html">Rollouts</a>
           <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
           <span class="crumb current" id="rolloutCrumb"></span>
         </nav>
       </div>
 
       <!-- ══ Topbar ═══════════════════════════════════════════
-           Rollout name and the two rollout outputs.
+           Back to the dashboard, the rollout name, and the two
+           rollout outputs.
            ───────────────────────────────────────────────────── -->
       <header class="rollout-topbar">
         <div class="page-width rollout-topbar__inner">
+          <a class="btn-ghost rollout-back" href="rollout-dashboard.html">
+            <i class="fa-regular fa-arrow-left" aria-hidden="true"></i> All rollouts
+          </a>
+          <span class="rollout-topbar__divider" aria-hidden="true"></span>
           <div class="rollout-title">
             Rollout Manager <span class="rollout-title__sub" id="rolloutName"></span>
           </div>
@@ -67,20 +89,207 @@
       <div class="rollout-tabs">
         <div class="page-width">
           <div class="tab-row" role="group" aria-label="View">
-            <button class="tab-btn active" type="button" id="tabMaster" aria-pressed="true">Master tickets</button>
-            <button class="tab-btn" type="button" id="tabDist" aria-pressed="false">Distribution list</button>
+            <button class="tab-btn active" type="button" id="tabOverview" aria-pressed="true">Overview</button>
+            <button class="tab-btn" type="button" id="tabMaster" aria-pressed="false">Master tickets</button>
+            <button class="tab-btn" type="button" id="tabShip" aria-pressed="false">Shipping</button>
+            <button class="tab-btn" type="button" id="tabDist" aria-pressed="false">Distribution</button>
           </div>
 
         </div>
       </div>
 
+      <!-- ══ Overview ═════════════════════════════════════════
+           The rollout at a glance: who it is for, where it is in its
+           timeline, and what is being made for whom. Static markup;
+           renderOverview() fills the values from `state`, so what is
+           here follows edits on the other tabs. The milestone list is
+           the same ten, in the same groups, as the dashboard.
+           ───────────────────────────────────────────────────── -->
+      <div class="overview" id="overview" hidden>
+        <div class="page-width overview__inner">
+
+          <!-- OverviewTimeline — a sheet: one column per milestone under its
+               department, rows for Target and Actual (editable date
+               fields, saved on change), a read-only Status row worked
+               out by rollout-status.js, and a Note row (a textarea
+               that wraps and grows with its text, saved on change). -->
+          <section class="overview-card" aria-labelledby="ovTimelineTitle">
+            <header class="overview-card__head">
+              <h2 class="overview-card__title" id="ovTimelineTitle">Project timeline</h2>
+              <span class="overview-card__sub" data-ov="timelineSummary"></span>
+            </header>
+            <div class="ov-timeline__scroller">
+            <table class="ov-timeline">
+              <!-- Fixed layout: the row-head column is set, the ten
+                   milestone columns share the rest equally. -->
+              <colgroup>
+                <col class="ov-timeline__col-head" />
+                <col span="10" class="ov-timeline__col" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col" rowspan="2" class="ov-timeline__corner"><span class="visually-hidden">Date</span></th>
+                  <th scope="colgroup" colspan="4" class="ov-timeline__group group-start">Pre-Production <span class="ov-timeline__owner">CSR / PrePress</span></th>
+                  <th scope="colgroup" colspan="3" class="ov-timeline__group group-start">Print Production</th>
+                  <th scope="colgroup" colspan="1" class="ov-timeline__group group-start">Shipping</th>
+                  <th scope="colgroup" colspan="2" class="ov-timeline__group group-start">Accounting</th>
+                </tr>
+                <tr>
+                  <th scope="col" class="ov-timeline__milestone group-start" data-milestone="filesReceived">Files Received</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="tickets">Tickets</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="initialProofOut">Initial Proof Out</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="filesApproved">Files Approved</th>
+                  <th scope="col" class="ov-timeline__milestone group-start" data-milestone="printed">Printed</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="cut">Cut</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="finishing">Finishing</th>
+                  <th scope="col" class="ov-timeline__milestone group-start" data-milestone="shipDate">Ship Date</th>
+                  <th scope="col" class="ov-timeline__milestone group-start" data-milestone="billingPrep">Billing Prep</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="billingCompleted">Billing Done</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="ov-timeline__row ov-timeline__row--target">
+                  <th scope="row" class="ov-timeline__rowhead">Target</th>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="filesReceived" data-field="target" aria-label="Files Received target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="tickets" data-field="target" aria-label="Tickets target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="initialProofOut" data-field="target" aria-label="Initial Proof Out target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="filesApproved" data-field="target" aria-label="Files Approved target" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="printed" data-field="target" aria-label="Printed target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="cut" data-field="target" aria-label="Cut target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="finishing" data-field="target" aria-label="Finishing target" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="shipDate" data-field="target" aria-label="Ship Date target" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="billingPrep" data-field="target" aria-label="Billing Prep target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="billingCompleted" data-field="target" aria-label="Billing Done target" /></td>
+                </tr>
+                <tr class="ov-timeline__row ov-timeline__row--actual">
+                  <th scope="row" class="ov-timeline__rowhead">Actual</th>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="filesReceived" data-field="actual" aria-label="Files Received actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="tickets" data-field="actual" aria-label="Tickets actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="initialProofOut" data-field="actual" aria-label="Initial Proof Out actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="filesApproved" data-field="actual" aria-label="Files Approved actual" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="printed" data-field="actual" aria-label="Printed actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="cut" data-field="actual" aria-label="Cut actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="finishing" data-field="actual" aria-label="Finishing actual" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="shipDate" data-field="actual" aria-label="Ship Date actual" /></td>
+                  <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="billingPrep" data-field="actual" aria-label="Billing Prep actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="billingCompleted" data-field="actual" aria-label="Billing Done actual" /></td>
+                </tr>
+                <tr class="ov-timeline__row ov-timeline__row--status">
+                  <th scope="row" class="ov-timeline__rowhead">Status</th>
+                  <td class="ov-timeline__status group-start" data-milestone="filesReceived"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="tickets"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="initialProofOut"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="filesApproved"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status group-start" data-milestone="printed"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="cut"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="finishing"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status group-start" data-milestone="shipDate"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status group-start" data-milestone="billingPrep"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="billingCompleted"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                </tr>
+                <tr class="ov-timeline__row ov-timeline__row--note">
+                  <th scope="row" class="ov-timeline__rowhead">Note</th>
+                  <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="filesReceived" data-field="note" aria-label="Files Received note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="tickets" data-field="note" aria-label="Tickets note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="initialProofOut" data-field="note" aria-label="Initial Proof Out note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="filesApproved" data-field="note" aria-label="Files Approved note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="printed" data-field="note" aria-label="Printed note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="cut" data-field="note" aria-label="Cut note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="finishing" data-field="note" aria-label="Finishing note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="shipDate" data-field="note" aria-label="Ship Date note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="billingPrep" data-field="note" aria-label="Billing Prep note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="billingCompleted" data-field="note" aria-label="Billing Done note"></textarea></td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+          </section>
+          <!-- /OverviewTimeline -->
+
+          <!-- Details stacked on the left, products beside it. -->
+          <div class="overview__split">
+
+          <!-- OverviewDetails — Rollout, Customer and CSR are editable in
+               place (.detail-field, the inventory cell-field treatment);
+               Sales is read from the customer's account. -->
+          <section class="overview-card overview-details" aria-labelledby="ovDetailsTitle">
+            <header class="overview-card__head">
+              <h2 class="overview-card__title" id="ovDetailsTitle">Details</h2>
+            </header>
+            <dl class="detail-list">
+              <div class="detail-list__item">
+                <dt class="detail-list__label"><label for="ovName">Rollout</label></dt>
+                <dd class="detail-list__value">
+                  <input class="detail-field" id="ovName" type="text" autocomplete="off" data-ov-edit="name" />
+                </dd>
+              </div>
+              <div class="detail-list__item">
+                <dt class="detail-list__label"><label for="ovCustomer">Customer</label></dt>
+                <dd class="detail-list__value">
+                  <!-- Typed and completed from the customer list; a name
+                       that is not a customer is refused. -->
+                  <input class="detail-field" id="ovCustomer" type="text" autocomplete="off"
+                         list="ovCustomerOptions" data-ov-edit="customer" />
+                  <datalist id="ovCustomerOptions"><!-- one <option> per customer --></datalist>
+                </dd>
+              </div>
+              <div class="detail-list__item">
+                <dt class="detail-list__label"><label for="ovCsr">CSR</label></dt>
+                <dd class="detail-list__value">
+                  <select class="detail-field detail-field--select" id="ovCsr" data-ov-edit="csr">
+                    <option value="">—</option>
+                    <!-- one <option> per CSR -->
+                  </select>
+                </dd>
+              </div>
+              <div class="detail-list__item">
+                <dt class="detail-list__label">Sales</dt>
+                <dd class="detail-list__value detail-list__value--derived">
+                  <span data-ov="sales"></span>
+                </dd>
+              </div>
+              <div class="detail-list__item">
+                <dt class="detail-list__label">Locations</dt>
+                <dd class="detail-list__value num" data-ov="locations"></dd>
+              </div>
+              <div class="detail-list__item">
+                <dt class="detail-list__label">Total quantity</dt>
+                <dd class="detail-list__value num" data-ov="total"></dd>
+              </div>
+            </dl>
+          </section>
+          <!-- /OverviewDetails -->
+
+          <!-- OverviewProducts — one card per product (ovProductCardTemplate)
+               in a wrapping grid, collapsed to its summary by default;
+               opening a card lists its versions (ovVersionLineTemplate). The card list scrolls; the timeline
+               and details above and beside it stay put. -->
+          <section class="overview-card overview-products" aria-labelledby="ovProductsTitle">
+            <header class="overview-card__head">
+              <h2 class="overview-card__title" id="ovProductsTitle">Products</h2>
+              <span class="overview-card__sub" data-ov="productSummary"></span>
+            </header>
+            <div class="product-cards" data-ov-products>
+              <!-- ovProductCardTemplate cards go here -->
+            </div>
+          </section>
+          <!-- /OverviewProducts -->
+
+          </div>
+
+        </div>
+      </div>
+      <!-- ══ /Overview ════════════════════════════════════════ -->
+
       <!-- ══ Grid ═════════════════════════════════════════════
            A view is a LIST of tables. The master tickets view is the
            ticket table — where tickets are added, removed and given
-           their job header fields — followed by one table per detail
-           position, because several parts can go into the one piece
-           that ships and each part has its own specs. The distribution
-           list is a single table.
+           their job header fields and tiers — followed by one table per
+           detail position, because several parts can go into the one
+           piece that ships and each part has its own specs. Shipping
+           (how each address ships) and Distribution (what each address
+           gets: quantity, and tier where the ticket has tiers) are one
+           table each.
 
            Each table is built in JS because its rows and columns are
            the data (tickets × fields, or fields × addresses), but its
@@ -106,6 +315,63 @@
           </header>
           <div class="gridwrap"><div class="page-width grid-host"></div></div>
         </section>
+      </template>
+
+      <!-- ══ Tier cell ════════════════════════════════════════
+           The Tiers column on the master tickets table. One chip per
+           tier on that ticket (name + how many addresses are on it),
+           then the add button. The warning pill shows only while some
+           address with a quantity has no tier yet. tierCell() clones
+           these; in Angular, an @for over version.tiers.
+           ───────────────────────────────────────────────────── -->
+      <template id="tierCellTemplate">
+        <span class="val tier-cell">
+          <span class="tier-cell__chips"></span>
+          <button class="tier-add" type="button" aria-label="Add version" title="Add version">
+            <i class="fa-regular fa-plus" aria-hidden="true"></i>
+          </button>
+          <button class="pill pill-warn tier-missing" type="button" hidden></button>
+        </span>
+      </template>
+      <template id="tierChipTemplate">
+        <button class="pill tier-chip" type="button">
+          <span class="tier-chip__name"></span>
+          <span class="tier-chip__count"></span>
+        </button>
+      </template>
+      <!-- ══ /Tier cell ═══════════════════════════════════════ -->
+      <!-- One product: name and job, its totals, then its versions. -->
+      <!-- One product. A native <details>: the summary is the card at
+           rest (name and job on the left, counts and total on the right);
+           opening it shows one line per version. A one-version product
+           has nothing to open (.product-card--single). -->
+      <template id="ovProductCardTemplate">
+        <details class="product-card">
+          <summary class="product-card__summary">
+            <span class="product-card__identity">
+              <span class="product-card__name"></span>
+              <span class="product-card__job"></span>
+            </span>
+            <span class="product-card__figures">
+              <span class="product-card__meta"></span>
+              <span class="product-card__qty"></span>
+              <i class="fa-regular fa-chevron-down product-card__chevron" aria-hidden="true"></i>
+            </span>
+          </summary>
+          <ul class="product-card__versions">
+            <!-- ovVersionLineTemplate lines go here -->
+          </ul>
+        </details>
+      </template>
+
+      <!-- One version of a product: name, job, locations, quantity. -->
+      <template id="ovVersionLineTemplate">
+        <li class="version-line">
+          <span class="version-line__name"></span>
+          <span class="version-line__job"></span>
+          <span class="version-line__locs"></span>
+          <span class="version-line__qty"></span>
+        </li>
       </template>
       <!-- ══ /Grid ════════════════════════════════════════════ -->
 
@@ -260,7 +526,8 @@ const GRIP = `<span class="grip" aria-hidden="true"><svg width="6" height="12" v
 const SEED = window.ROLLOUT_DATA || {rollout:{}, versions:[], addresses:[], qtys:{}, addrValues:{}};
 
 let state = {
-  versions: JSON.parse(JSON.stringify(SEED.versions)),
+  /* Every version carries a tiers array, empty when it has none. */
+  versions: JSON.parse(JSON.stringify(SEED.versions)).map(v=>({tiers:[], ...v})),
   addresses: JSON.parse(JSON.stringify(SEED.addresses)),
 
   /* The distribution list itself: a quantity per version per address,
@@ -269,10 +536,23 @@ let state = {
      there is no separate list of who gets what to keep in step. */
   qtys: {...SEED.qtys},
 
+  /* Which tier an address gets on a tiered ticket, keyed "vId::aId"
+     like qtys, valued with a tier id from that version's tiers. */
+  tierOf: {...(SEED.tierOf||{})},
+
   /* Address-scoped values, keyed "aId::fId". */
   addrValues: {...SEED.addrValues},
 
-  view:"master",
+  /* Milestone dates for the Overview timeline, {key: {target, actual,
+     note}}. Read-only here; edited on the dashboard. */
+  milestones: JSON.parse(JSON.stringify((SEED.rollout && SEED.rollout.milestones) || {})),
+
+  /* Rollout identity — name, customer, CSR — editable on the Overview.
+     Sales is not stored: salesFor() reads it from the customer. */
+  rollout: {name:(SEED.rollout||{}).name||"", customer:(SEED.rollout||{}).customer||"",
+            csr:(SEED.rollout||{}).csr||""},
+
+  view:"overview",
 };
 
 const nextId = (p, arr)=>{let n=1; const ids=new Set(arr.map(x=>x.id)); while(ids.has(p+n)) n++; return p+n;};
@@ -311,9 +591,42 @@ function versionTotal(vId){
   }, 0);
 }
 
+/* ── Tiers ─────────────────────────────────────────────────────
+   A tier is a content variant of a master ticket: T1 and T2 of the
+   Main Menu Card share every spec and differ only in what is printed
+   on them, so a tier has a name and nothing else. Specs stay on the
+   master ticket's details.
+
+   A ticket with no tiers is one design for everyone and gets no Tier
+   column on the distribution. Membership is still the quantity; the
+   tier only says WHICH design an address that receives it gets.
+   ------------------------------------------------------------- */
+const tiersOf  = vId => (VER(vId) && VER(vId).tiers) || [];
+const hasTiers = vId => tiersOf(vId).length > 0;
+const TIER     = (vId,tId) => tiersOf(vId).find(t=>t.id===tId);
+const getTier  = (vId,aId) => state.tierOf[qtyKey(vId,aId)] ?? "";
+const tierName = (vId,aId) => (TIER(vId, getTier(vId,aId)) || {}).name || "";
+function setTier(vId, aId, tId){
+  if(!tId) delete state.tierOf[qtyKey(vId,aId)];
+  else state.tierOf[qtyKey(vId,aId)] = tId;
+}
+const addressesOnTier = (vId,tId) => addressesOn(vId).filter(a=>getTier(vId,a.id)===tId);
+/* Receiving a tiered ticket with no tier is half an entry — it cannot
+   become a ticket until someone says which design it gets. */
+const needsTier = (vId,aId) => hasTiers(vId) && receives(vId,aId) && !TIER(vId, getTier(vId,aId));
+const untiered  = vId => addressesOn(vId).filter(a=>needsTier(vId, a.id));
+const findTierByName = (vId, name) => {
+  const n=String(name??"").trim().toLowerCase();
+  return tiersOf(vId).find(t=>t.name.toLowerCase()===n) || null;
+};
+/* What a spun-off ticket is called: master, tier (if any), address —
+   "Main Menu Card - T1 - Boston", "Dessert Menu Card - Boston". */
+const ticketName = (vId,aId) =>
+  [VER(vId).desc || VER(vId).job, tierName(vId,aId), ADDR(aId).name].filter(Boolean).join(" - ");
+
 /* ============================ HISTORY ============================ */
 const snap = ()=>JSON.stringify({v:state.versions,a:state.addresses,
-  q:state.qtys,av:state.addrValues,f:FIELDS,jf:JOBFIELDS,s:SPECS});
+  q:state.qtys,t:state.tierOf,av:state.addrValues,ms:state.milestones,ro:state.rollout,f:FIELDS,jf:JOBFIELDS,s:SPECS});
 let past=[], future=[], pending=null;
 function begin(){ pending = snap(); }
 function commit(){
@@ -323,7 +636,8 @@ function commit(){
 }
 function restore(js){
   const o=JSON.parse(js);
-  state.versions=o.v; state.addresses=o.a; state.qtys=o.q; state.addrValues=o.av;
+  state.versions=o.v; state.addresses=o.a; state.qtys=o.q; state.tierOf=o.t||{}; state.addrValues=o.av;
+  state.milestones=o.ms||{}; state.rollout=o.ro||state.rollout;
   FIELDS=o.f; reindexFields();
   JOBFIELDS=o.jf||JOBFIELDS; reindexJobFields();
   SPECS=o.s;
@@ -341,7 +655,9 @@ function redo(){ if(!future.length) return; const cur=snap(); restore(future.pop
                    position. Adding and removing tickets, and the job
                    header fields, happen on the first table; everything
                    about a part happens on that part's table.
-     dist view   → the distribution list, one table.
+     ship view   → shipping: addresses × shipping fields, one table.
+     dist view   → distribution: addresses × (quantity, tier) per
+                   master ticket, one table.
    ------------------------------------------------------------------ */
 
 function masterTable(){
@@ -355,7 +671,11 @@ function masterTable(){
     /* Quantity first, as a read-only roll-up of the distribution list.
        It is pinned: it is what the rest of the row is read against, so
        nothing moves in front of it. */
-    cols: [{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true}]
+    cols: [{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true},
+           /* Tiers are the ticket's own, so they sit with the ticket
+              rather than on a table of their own. Pinned beside the
+              quantity: they are how that quantity splits. */
+           {key:"__tiers", kind:"tiers", label:"Versions", w:260, pinned:true}]
            .concat(JOBFIELDS.map(f=>({key:f.id, kind:"jobfield", label:f.name, num:f.num,
                      w:f.w||180, movable:true, options:f.options, bool:f.bool})))
            .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
@@ -365,6 +685,10 @@ function masterTable(){
         const total = versionTotal(rk);
         return {kind:"data", value:String(total), display:total.toLocaleString(),
                 num:true, editable:false, derived:true};
+      }
+      if(ck==="__tiers"){
+        const names = tiersOf(rk).map(t=>t.name).join(", ");
+        return {kind:"data", value:names, display:names, editable:false, tiers:true, version:rk};
       }
       if(ck==="oldJob" && !oldJobApplies(rk)){
         return {kind:"data", value:"", display:"n/a", editable:false, na:true};
@@ -414,43 +738,79 @@ function detailTable(d){
   };
 }
 
-function distTable(){
+/* ── Shipping ──────────────────────────────────────────────────
+   How each address ships. One value per address, whatever it is
+   receiving, so nothing here varies by master ticket.
+   ------------------------------------------------------------- */
+function shipTable(){
   return {
-    id:"dist", kind:"dist",
-    title:"Distribution list",
+    id:"ship", kind:"ship",
+    title:"Shipping",
     sub:`${state.addresses.length} address${state.addresses.length===1?"":"es"}`,
     rowHead:"Address",
-    rows: state.addresses.map(a=>({key:a.id, kind:"address", label:a.name,
-             sub:[a.code, a.city].filter(Boolean).join(" · ")}))
-          .concat([{key:"__add", kind:"addrow", label:"+ New address"}]),
-    /* Quantity columns are pinned. They are the distribution list
-       itself — the membership record — so they keep their order under
-       the Quantity group header and no shipping field can be dropped in
-       front of them. */
-    /* A quantity column is headed by what the version IS, not its job
-       number — the numbers underneath are what the column is read for,
-       and the job number is one hover away in the title. */
-    cols: state.versions.map(v=>({key:"q:"+v.id, kind:"qty", version:v.id,
-              group:"Quantity", label:v.desc || v.job, num:true, w:120, pinned:true}))
-          .concat(FIELDS.map(f=>({key:f.id, kind:"field", label:f.name, num:f.num,
-              w:f.id==="notes"?230:160, movable:true})))
+    rows: addressRows(),
+    cols: FIELDS.map(f=>({key:f.id, kind:"field", label:f.name, num:f.num,
+              w:f.id==="notes"?230:160, movable:true}))
           .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
     cellAt(rk, ck){
       if(rk==="__add"||ck==="__addfield") return {kind:"blank"};
-      if(ck.startsWith("q:")){
-        const val=getQty(ck.slice(2), rk);
-        return {kind:"data", value:val, display:val, num:true, editable:true, qty:true};
-      }
       const val=addrVal(rk, ck);
       return {kind:"data", value:val, display:val, num:FIELD[ck].num, editable:true};
     }
   };
 }
 
+/* ── Distribution ──────────────────────────────────────────────
+   What each address gets. One column group per master ticket, headed
+   by what the ticket IS: Quantity, then Tier when the ticket has
+   tiers. Every column is pinned — the order is the order of the
+   master tickets, and there are no fields to add here.
+   ------------------------------------------------------------- */
+function distTable(){
+  const cols=[];
+  state.versions.forEach(v=>{
+    const group = v.desc || v.job;
+    const tiered = hasTiers(v.id);
+    cols.push({key:"q:"+v.id, kind:"qty", version:v.id, group, groupKey:v.id,
+               label:"Quantity", num:true, w:96, pinned:true, groupEnd:!tiered});
+    if(tiered) cols.push({key:"t:"+v.id, kind:"tier", version:v.id, group, groupKey:v.id,
+               label:"Version", w:120, pinned:true, groupEnd:true});
+  });
+  return {
+    id:"dist", kind:"dist",
+    title:"Distribution",
+    sub:`${state.addresses.length} address${state.addresses.length===1?"":"es"}`,
+    rowHead:"Address",
+    rows: addressRows(),
+    cols,
+    cellAt(rk, ck){
+      if(rk==="__add") return {kind:"blank"};
+      const vId=ck.slice(2);
+      if(ck.startsWith("q:")){
+        const val=getQty(vId, rk);
+        return {kind:"data", value:val, display:val, num:true, editable:true, qty:true};
+      }
+      /* Tier: typed like Job Type — completes from this ticket's
+         tiers and refuses anything else. */
+      const val=tierName(vId, rk);
+      return {kind:"data", value:val, display:val, editable:true, tier:true,
+              options:tiersOf(vId).map(t=>t.name), flag:needsTier(vId, rk)};
+    }
+  };
+}
+
+/* Both address tables list the same rows, and both can add one. */
+function addressRows(){
+  return state.addresses.map(a=>({key:a.id, kind:"address", label:a.name,
+           sub:[a.code, a.city].filter(Boolean).join(" · ")}))
+         .concat([{key:"__add", kind:"addrow", label:"+ New address"}]);
+}
+
 function model(){
-  return state.view==="master"
-    ? [masterTable()].concat(detailPositions().map(detailTable))
-    : [distTable()];
+  if(state.view==="overview") return [];
+  if(state.view==="master") return [masterTable()].concat(detailPositions().map(detailTable));
+  if(state.view==="ship")   return [shipTable()];
+  return [distTable()];
 }
 
 /* ============================ SELECTION ============================ */
@@ -519,30 +879,181 @@ function render(){
   M = model();
   if(sel) clampSel();
   renderChrome();
+  renderIdentity();
   renderTables();
+  /* The Overview is markup, not a grid: show one or the other. */
+  const ov = state.view==="overview";
+  document.getElementById("overview").hidden = !ov;
+  viewhost.hidden = ov;
+  if(ov) renderOverview();
 }
 
-/* Rollout identity, from the data file. */
-(function(){
-  const r=(window.ROLLOUT_DATA&&window.ROLLOUT_DATA.rollout)||{};
+/* ============================ OVERVIEW ============================ */
+/* Fills the static Overview markup from `state`. Called on every
+   render while the tab is open, so it follows edits made elsewhere. */
+const ovSet = (key, text)=>{ const el=document.querySelector(`[data-ov="${key}"]`); if(el) el.textContent=text; };
+const plural = (n, w)=>`${n.toLocaleString()} ${w}${n===1?"":"s"}`;
+
+/* Which product cards are expanded on the Overview (by version id). */
+const openProducts = new Set();
+
+/* Sales comes with the customer's account. */
+const CUSTOMERS = window.ROLLOUT_CUSTOMERS || [];
+const findCustomer = name => CUSTOMERS.find(c=>c.name.toLowerCase()===String(name??"").trim().toLowerCase()) || null;
+const salesFor = name => (findCustomer(name) || {}).sales || "";
+
+/* One-time setup: fill the customer / CSR option lists, and wire the
+   editable fields. Each change is one undoable step. */
+(function wireOverview(){
+  const dl = document.getElementById("ovCustomerOptions");
+  CUSTOMERS.forEach(c=>{ const o=document.createElement("option"); o.value=c.name; dl.appendChild(o); });
+  const csr = document.getElementById("ovCsr");
+  (window.ROLLOUT_CSRS||[]).forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; csr.appendChild(o); });
+
+  document.querySelectorAll("[data-ov-edit]").forEach(el=>{
+    el.addEventListener("change", ()=>{
+      const key=el.dataset.ovEdit, val=el.value.trim();
+      if(key==="name" && !val){ el.value=state.rollout.name; toast("A rollout needs a name."); return; }
+      if(key==="customer"){
+        const c=findCustomer(val);
+        if(!c){ el.value=state.rollout.customer; toast(`"${val}" is not a customer. Pick one from the list.`); return; }
+        begin(); state.rollout.customer=c.name; commit();
+        toast(`Customer set to ${c.name}. Sales: ${c.sales || "not on file"}.`, "Undo", undo);
+        return;
+      }
+      begin(); state.rollout[key]=val; commit();
+    });
+    /* Enter commits a text field the way Tab does. */
+    if(el.tagName==="INPUT") el.addEventListener("keydown", e=>{
+      if(e.key==="Enter"){ e.preventDefault(); el.blur(); }
+      if(e.key==="Escape"){ el.value=state.rollout[el.dataset.ovEdit]||""; el.blur(); }
+    });
+  });
+
+  document.querySelectorAll(".ov-timeline .cell-field").forEach(inp=>{
+    /* Enter commits a note the way Tab does (Shift+Enter is a new
+       line); Esc puts it back. */
+    if(inp.dataset.field==="note") inp.addEventListener("keydown", e=>{
+      if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); inp.blur(); }
+      if(e.key==="Escape"){ inp.value=(state.milestones[inp.dataset.milestone]||{}).note||""; inp.blur(); }
+    });
+    inp.addEventListener("change", ()=>{
+      const k=inp.dataset.milestone;
+      begin();
+      const m={...(state.milestones[k]||{}), [inp.dataset.field]: inp.value.trim()};
+      if(!m[inp.dataset.field]) delete m[inp.dataset.field];
+      if(Object.keys(m).length) state.milestones[k]=m; else delete state.milestones[k];
+      commit();
+    });
+  });
+})();
+
+function renderOverview(){
+  const r = state.rollout;
+  const locs = new Set(Object.keys(state.qtys).filter(k=>String(state.qtys[k]).trim()!=="")
+                 .map(k=>k.split("::")[1])).size;
+  const total = state.versions.reduce((n,v)=>n+versionTotal(v.id), 0);
+  /* Editable fields: only overwrite one that is not being typed in. */
+  document.querySelectorAll("[data-ov-edit]").forEach(el=>{
+    if(el !== document.activeElement) el.value = r[el.dataset.ovEdit] || "";
+  });
+  const sales = salesFor(r.customer);
+  ovSet("sales", sales || "Not on file");
+  document.querySelector('[data-ov="sales"]').classList.toggle("is-missing", !sales);
+  ovSet("locations", locs.toLocaleString());
+  ovSet("total", total.toLocaleString());
+
+  /* Timeline sheet. */
+  const RS = window.RolloutStatus;
+  document.querySelectorAll(".ov-timeline .cell-field").forEach(inp=>{
+    const m = state.milestones[inp.dataset.milestone] || {};
+    if(inp !== document.activeElement) inp.value = m[inp.dataset.field] || "";
+    inp.classList.toggle("is-empty", !inp.value);
+  });
+  const counts = {done:0, late:0, due:0};
+  const statusCells = document.querySelectorAll(".ov-timeline__status");
+  statusCells.forEach(td=>{
+    const st = RS.milestoneStatus(state.milestones[td.dataset.milestone]);
+    if(st.state in counts) counts[st.state]++;
+    RS.STATES.forEach(x=>td.classList.toggle("is-"+x, st.state===x));
+    td.querySelector(".status-dot").className = "status-dot status-dot--"+st.state;
+    td.querySelector(".ov-timeline__status-text").textContent =
+      st.state==="upcoming" ? "Upcoming" : st.state==="empty" ? "—" : st.sub;
+  });
+  ovSet("timelineSummary", [`${counts.done} of ${statusCells.length} done`,
+    counts.late && `${counts.late} late`, counts.due && `${counts.due} due soon`].filter(Boolean).join(" · "));
+
+  /* Products → versions, one card each. A product with no versions is
+     one version for every location it ships to, so it has no lines. */
+  const host = document.querySelector("[data-ov-products]");
+  host.replaceChildren();
+  const qtyOf = (vId, list)=>list.reduce((n,a)=>{
+    const q=parseFloat(String(getQty(vId,a.id)).replace(/[^0-9.\-]/g,"")); return n+(isNaN(q)?0:q); }, 0);
+  const line = (name, job, locs, qty, missing)=>{
+    const li = document.getElementById("ovVersionLineTemplate").content.firstElementChild.cloneNode(true);
+    if(missing) li.classList.add("version-line--missing");
+    li.querySelector(".version-line__name").textContent = name;
+    li.querySelector(".version-line__job").textContent = job;
+    li.querySelector(".version-line__locs").textContent = plural(locs, "location");
+    li.querySelector(".version-line__qty").textContent = qty.toLocaleString();
+    return li;
+  };
+  let versionCount = 0;
+  state.versions.forEach(v=>{
+    const card = document.getElementById("ovProductCardTemplate").content.firstElementChild.cloneNode(true);
+    const tiers = tiersOf(v.id);
+    versionCount += tiers.length || 1;
+    card.querySelector(".product-card__name").textContent = v.desc || v.job;
+    card.querySelector(".product-card__job").textContent = v.job;
+    card.querySelector(".product-card__qty").textContent = versionTotal(v.id).toLocaleString();
+    card.querySelector(".product-card__meta").textContent =
+      `${plural(tiers.length || 1, "version")} · ${plural(addressesOn(v.id).length, "location")}`;
+    const list = card.querySelector(".product-card__versions");
+    tiers.forEach(t=>{
+      const on = addressesOnTier(v.id, t.id);
+      list.appendChild(line(t.name, t.job || "", on.length, qtyOf(v.id, on)));
+    });
+    /* Addresses receiving a multi-version ticket with no version yet. */
+    const missing = untiered(v.id);
+    if(missing.length) list.appendChild(line("No version yet", "", missing.length, qtyOf(v.id, missing), true));
+    /* Open state survives re-renders: it is kept per product. */
+    if(!list.children.length){
+      list.remove();
+      card.classList.add("product-card--single");
+      card.querySelector("summary").addEventListener("click", e=>e.preventDefault());
+    } else {
+      card.open = openProducts.has(v.id);
+      card.addEventListener("toggle", ()=>{ card.open ? openProducts.add(v.id) : openProducts.delete(v.id); });
+    }
+    host.appendChild(card);
+  });
+  ovSet("productSummary", `${plural(state.versions.length, "product")} · ${plural(versionCount, "version")}`);
+}
+
+/* Rollout identity in the topbar and breadcrumb — from state, so a
+   rename on the Overview shows up here. */
+function renderIdentity(){
+  const r=state.rollout;
   const label=[r.customer, r.name].filter(Boolean).join(" · ");
   const n=document.getElementById("rolloutName"), c=document.getElementById("rolloutCrumb");
   if(n) n.textContent = label ? "/ "+label : "";
   if(c) c.textContent = r.name || "Rollout";
-})();
+}
 
 function setTab(btn, on){
   btn.classList.toggle("active", on);
   btn.setAttribute("aria-pressed", on);
 }
 function renderChrome(){
+  setTab(document.getElementById("tabOverview"), state.view==="overview");
   setTab(document.getElementById("tabMaster"), state.view==="master");
+  setTab(document.getElementById("tabShip"),   state.view==="ship");
   setTab(document.getElementById("tabDist"),   state.view==="dist");
 }
 
 /* Each table gets its own <section> from the template in the markup —
    heading, then a scroller holding the table. The master view stacks
-   several; the distribution list is one, and fills the height. */
+   several; shipping and distribution are one each, and fill the height. */
 function renderTables(){
   viewhost.className = "viewhost " + (M.length>1 ? "viewhost--stack" : "viewhost--single");
   viewhost.innerHTML = "";
@@ -561,14 +1072,15 @@ function renderTables(){
 function buildTable(T,t){
   const tbl=document.createElement("table");
   const colg=document.createElement("colgroup");
-  colg.innerHTML = `<col style="width:${T.kind==="dist"?"var(--rm-rowhead-width-dist)":"var(--rm-rowhead-width)"}">` +
+  const addrTable = T.kind==="ship" || T.kind==="dist";
+  colg.innerHTML = `<col style="width:${addrTable?"var(--rm-rowhead-width-dist)":"var(--rm-rowhead-width)"}">` +
     T.cols.map(c=>`<col style="width:${c.w||150}px">`).join("");
   tbl.appendChild(colg);
 
-  /* Head. Columns may declare a `group`; consecutive columns sharing one
-     get a spanning header above them and their own label below, so the
-     quantity columns stay as narrow as the numbers in them. Ungrouped
-     columns span both rows. */
+  /* Head. Columns may declare a `group` (the label) and a `groupKey`
+     (what makes them one group — two tickets can share a name);
+     consecutive columns sharing one get a spanning header above them
+     and their own label below. Ungrouped columns span both rows. */
   const thead=document.createElement("thead");
   const grouped = T.cols.some(c=>c.group);
   const hr=document.createElement("tr");
@@ -587,35 +1099,35 @@ function buildTable(T,t){
       return th;
     }
     const s=sel&&norm(sel);
-    th.className="hd" + (c.kind==="qty" ? " hd-qty":"") +
+    th.className="hd" + (c.kind==="qty"||c.kind==="tier" ? " hd-qty":"") +
+      (c.num ? " hd-num":"") + (c.groupEnd ? " group-end":"") +
       (c.movable ? " hd-move" : " hd-pinned") +
       (s&&s.t===t&&ci>=s.c0&&ci<=s.c1 ? " hd-sel":"");
     th.dataset.col=ci;
-    if(c.kind==="qty") th.title = "Job "+VER(c.version).job+(VER(c.version).desc?" · "+VER(c.version).desc:"");
-    else if(c.group && c.sub) th.title = c.label+" · "+c.sub;
-    th.innerHTML = c.group
-      ? `<span class="cellpad cellpad--stack"><span class="hd-label">${esc(c.label)}</span>${
-          c.sub?`<span class="sub">${esc(c.sub)}</span>`:""}</span>`
-      : `<span class="cellpad">${c.movable?GRIP:""}<span class="hd-label">${esc(c.label)}${
+    if(c.version) th.title = verFull(c.version) + " · " + c.label;
+    th.innerHTML = `<span class="cellpad">${c.movable?GRIP:""}<span class="hd-label">${esc(c.label)}${
           c.sub?`<span class="sub"> · ${esc(c.sub)}</span>`:""}</span></span>`;
     if(c.movable) wireColumnDrag(th, T, c);
     else if(!th.title) th.title = c.label + " — fixed column";
     if(c.kind==="spec")     th.oncontextmenu=e=>{e.preventDefault(); specMenu(e, c.key);};
     if(c.kind==="field")    th.oncontextmenu=e=>{e.preventDefault(); fieldMenu(e, c.key);};
     if(c.kind==="jobfield") th.oncontextmenu=e=>{e.preventDefault(); jobFieldMenu(e, c.key);};
-    if(c.kind==="qty")      th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e, c.version);};
+    if(c.version)           th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e, c.version);};
     return th;
   }
 
   for(let ci=0; ci<T.cols.length; ci++){
     const c=T.cols[ci];
     if(grouped && c.group){
+      const gk = x => x.groupKey ?? x.group;
       let span=1;
-      while(ci+span<T.cols.length && T.cols[ci+span].group===c.group) span++;
+      while(ci+span<T.cols.length && gk(T.cols[ci+span])===gk(c)) span++;
       const gth=document.createElement("th");
-      gth.className="hd-group";
+      gth.className="hd-group group-end";
       gth.colSpan=span;
+      gth.title=c.version ? verFull(c.version) : c.group;
       gth.innerHTML=`<span class="cellpad">${esc(c.group)}</span>`;
+      if(c.version) gth.oncontextmenu=e=>{e.preventDefault(); versionMenu(e, c.version);};
       hr.appendChild(gth);
       for(let k=0;k<span;k++) hr2.appendChild(headerCell(T.cols[ci+k], ci+k));
       ci += span-1;
@@ -671,13 +1183,19 @@ function buildTable(T,t){
       if(cell.context) cls.push("context");
       if(cell.na) cls.push("na");
       if(cell.qty) cls.push("qty");
+      if(cell.tier) cls.push("tier");
+      if(cell.flag) cls.push("flag");
       if(cell.num) cls.push("num");
-      if(!String(cell.display||"").length) cls.push("empty");
+      if(C.groupEnd) cls.push("group-end");
+      if(!cell.tiers && !String(cell.display||"").length) cls.push("empty");
       if(cell.bool) cls.push("bool");
+      if(cell.tiers) cls.push("tiers");
       td.className=cls.join(" ");
       /* A checkbox cell renders the control itself — there is nothing to
-         type into it, so it has no editor. */
-      td.innerHTML = cell.bool
+         type into it, so it has no editor. The tiers cell is chips from
+         its template. */
+      if(cell.tiers){ td.dataset.tiers=cell.version; td.appendChild(tierCell(cell.version)); }
+      else td.innerHTML = cell.bool
         ? `<span class="val"><input type="checkbox" class="cell-check"${cell.checked?" checked":""} aria-label="${esc(C.label)}"></span>`
         : `<span class="val">${esc(cell.display||"")}</span>`;
       applySel(td,t,ri,ci);
@@ -687,6 +1205,34 @@ function buildTable(T,t){
   });
   tbl.appendChild(tbody);
   return tbl;
+}
+
+/* The Tiers cell: a chip per tier, the add button, and a warning while
+   any address receiving the ticket has no tier. Markup is the two
+   templates in the page. */
+function tierCell(vId){
+  const cell = document.getElementById("tierCellTemplate").content.firstElementChild.cloneNode(true);
+  const chips = cell.querySelector(".tier-cell__chips");
+  const chipTpl = document.getElementById("tierChipTemplate").content.firstElementChild;
+  tiersOf(vId).forEach(tier=>{
+    const chip = chipTpl.cloneNode(true);
+    const n = addressesOnTier(vId, tier.id).length;
+    chip.querySelector(".tier-chip__name").textContent = tier.name;
+    chip.querySelector(".tier-chip__count").textContent = n;
+    chip.title = `${tier.name}${tier.job?" · job "+tier.job:""} · ${n} address${n===1?"":"es"}`;
+    chip.onclick = e=>tierMenu(e, vId, tier.id);
+    chips.appendChild(chip);
+  });
+  cell.querySelector(".tier-add").onclick = ()=>addTier(vId);
+  const missing = untiered(vId).length;
+  const warn = cell.querySelector(".tier-missing");
+  if(missing){
+    warn.hidden = false;
+    warn.textContent = `${missing} need${missing===1?"s":""} a version`;
+    warn.title = "Addresses with a quantity but no version. Assign them on the distribution.";
+    warn.onclick = ()=>{ state.view="dist"; sel=null; render(); };
+  }
+  return cell;
 }
 
 function applySel(td,t,ri,ci){
@@ -756,7 +1302,7 @@ function wireColumnDrag(th, T, c){
 /* Which array holds a table's movable columns, and what a column is
    called in a toast. */
 function orderList(T){
-  return T.kind==="master" ? JOBFIELDS : T.kind==="dist" ? FIELDS : SPECS;
+  return T.kind==="master" ? JOBFIELDS : T.kind==="ship" ? FIELDS : SPECS;
 }
 const colName = x => x.name || specLabel(x);
 
@@ -769,7 +1315,7 @@ function moveColumn(T, fromKey, toKey, before){
   const [item] = list.splice(from,1);
   const to = list.findIndex(x=>x.id===toKey);
   list.splice(before ? to : to+1, 0, item);
-  if(T.kind==="dist") reindexFields();
+  if(T.kind==="ship") reindexFields();
   if(T.kind==="master") reindexJobFields();
   sel=null;
   commit();
@@ -783,12 +1329,13 @@ function startEdit(t,r,c,seed){
   if(!R||!C) return;
   const cell=T.cellAt(R.key,C.key);
   if(cell.kind!=="data" || !cell.editable){
-    if(cell.derived) toast("This is the total of its addresses' quantities.", "Open distribution list", ()=>{
+    if(cell.derived) toast("This is the total of its addresses' quantities.", "Open distribution", ()=>{
       state.view="dist"; sel=null; render();
     });
     else if(cell.context) toast("Set on the master ticket.", "Open master tickets", ()=>{
       state.view="master"; sel=null; render();
     });
+    else if(cell.tiers) toast("Add a version with +. Click a version to rename or remove it.");
     else if(cell.na) toast("Old Job Num applies to a re-run or a pull-plate. Set Job Type first.");
     return;
   }
@@ -962,6 +1509,12 @@ function applyValue(t,r,c,val){
     det.specs[specKey(sp)]=String(val).trim();
   } else if(C.kind==="qty"){
     setQty(C.version, R.key, val);
+  } else if(C.kind==="tier"){
+    /* Stored by id, typed by name. A pasted name that is not one of
+       this ticket's tiers leaves the cell as it was. */
+    if(String(val).trim()===""){ setTier(C.version, R.key, ""); return; }
+    const tier=findTierByName(C.version, val);
+    if(tier) setTier(C.version, R.key, tier.id);
   } else if(C.kind==="field"){
     setAddrValue(R.key, C.key, val);
   }
@@ -1072,6 +1625,9 @@ document.addEventListener("paste", e=>{
 /* ============================ MOUSE ============================ */
 let dragging=false;
 viewhost.addEventListener("mousedown", e=>{
+  /* The tier controls are buttons with their own click. Selecting the
+     cell would re-render and detach them before the click lands. */
+  if(e.target.closest(".tier-chip, .tier-add, .tier-missing")) return;
   if(e.target.dataset.handle){ beginFill(e); return; }
   const td=e.target.closest("td[data-r]");
   if(!td) return;
@@ -1193,7 +1749,7 @@ function versionMenu(e, vId){
   const n=addressesOn(vId).length;
   menu(e.clientX,e.clientY,
     `<div class="mlabel">Job ${esc(VER(vId).job)}${VER(vId).desc?" · "+esc(VER(vId).desc):""}</div>
-     <button data-a="open">${state.view==="master"?"Open distribution list":"Open master tickets"}</button>
+     <button data-a="open">${state.view==="master"?"Open distribution":"Open master tickets"}</button>
      <button data-a="dup">Duplicate master ticket</button><hr>
      <button class="danger" data-a="del">Delete master ticket</button>
      <div class="mnote">Its details and the quantities for ${n} address${n===1?"":"es"} go with it.</div>`,
@@ -1211,14 +1767,14 @@ function addressMenu(e, aId){
      <button class="danger" data-a="rm">Remove from rollout</button>
      <div class="mnote">${vs.length
        ? `Its quantities on job${vs.length===1?"":"s"} ${esc(vs.map(v=>v.job).join(", "))} go with it.`
-       : `It has no quantities on any version.`}</div>`,
+       : `It has no quantities on any master ticket.`}</div>`,
     m=>{ m.querySelector('[data-a="rm"]').onclick=()=>{closeMenu(); removeAddress(aId);}; });
 }
 
 /* "+ Add field" — which catalog it offers depends on the table it sits
    on, which is the point of splitting them: job header fields on the
    master tickets table, that detail's spec fields on a detail table,
-   shipping fields on the distribution list. */
+   shipping fields on shipping. */
 function addColumnMenu(T, anchor){
   if(T.kind==="master") return addJobFieldMenu(anchor);
   if(T.kind==="detail") return addSpecMenu(T.detail, anchor);
@@ -1308,7 +1864,7 @@ function specMenu(e, spId){
     };});
 }
 
-/* ── Add a distribution list field ─────────────────────────────
+/* ── Add a shipping field ──────────────────────────────────────
    The catalog is the job maintenance shipping tab: nothing here is
    invented for the rollout.
    ------------------------------------------------------------- */
@@ -1319,7 +1875,7 @@ function addShipFieldMenu(anchor){
     `<div class="mlabel">Shipping field</div>` +
     (avail.length
       ? avail.map(c=>`<button data-ship="${c.id}">${esc(c.name)}
-          <div class="mnote mnote--inline">One value per address, shared by every version it receives.</div></button>`).join("")
+          <div class="mnote mnote--inline">One value per address, shared by every ticket it receives.</div></button>`).join("")
       : `<div class="mnote">Every shipping field is already on this rollout.</div>`),
     m=>m.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{
       closeMenu(); addShipField(b.dataset.ship);
@@ -1330,7 +1886,7 @@ function addShipField(id){
   begin();
   FIELDS.push({...c}); reindexFields();
   commit();
-  toast(`${c.name} added to the distribution list.`, "Undo", undo);
+  toast(`${c.name} added to shipping.`, "Undo", undo);
 }
 function fieldMenu(e, fId){
   const f=FIELD[fId];
@@ -1350,7 +1906,7 @@ function deleteField(fId){
   FIELDS=FIELDS.filter(f=>f.id!==fId); reindexFields();
   Object.keys(state.addrValues).forEach(k=>{ if(k.endsWith("::"+fId)) delete state.addrValues[k]; });
   sel=null; commit();
-  toast(`${nm} removed from the distribution list.`, "Undo", undo);
+  toast(`${nm} removed from shipping.`, "Undo", undo);
 }
 
 /* ============================ STRUCTURAL OPS ============================ */
@@ -1360,29 +1916,36 @@ function addVersion(){
   const base=state.versions[state.versions.length-1];
   /* The new ticket takes the shape of the last one — the same details,
      so it lands on the same detail tables — but none of its values. */
-  state.versions.push({id, job:nextJob(), desc:"", fields:{},
+  state.versions.push({id, job:nextJob(), desc:"", fields:{}, tiers:[],
     details: base ? base.details.map(d=>({name:d.name, specs:{}})) : [{name:"Inserts", specs:{}}]});
   commit();
   state.view="master"; render();
   const ri=state.versions.length-1;
   const th=document.querySelectorAll('[data-table="master"] tbody th.hd')[ri];
   if(th) inlineRename(th, state.versions[ri].job, v=>{ begin(); state.versions[ri].job=v||state.versions[ri].job; commit(); });
-  toast("Master ticket added. Set its job number, then enter quantities on the distribution list.", "Undo", undo);
+  toast("Master ticket added. Set its job number, then enter quantities on the distribution.", "Undo", undo);
 }
 function duplicateVersion(vId){
   begin();
   const src=VER(vId), id=nextId("v", state.versions);
   state.versions.push({id, job:nextJob(), desc:src.desc, fields:{...(src.fields||{})},
+    tiers: JSON.parse(JSON.stringify(src.tiers||[])),
     details: JSON.parse(JSON.stringify(src.details))});
-  state.addresses.forEach(a=>{ if(receives(vId, a.id)) setQty(id, a.id, getQty(vId, a.id)); });
+  /* Tier ids are local to a ticket, so the copy's tiers keep the same
+     ids and each address keeps its tier. */
+  state.addresses.forEach(a=>{
+    if(receives(vId, a.id)) setQty(id, a.id, getQty(vId, a.id));
+    if(getTier(vId, a.id)) setTier(id, a.id, getTier(vId, a.id));
+  });
   commit();
-  toast("Master ticket duplicated with its details and quantities.", "Undo", undo);
+  toast("Master ticket duplicated with its details, versions and quantities.", "Undo", undo);
 }
 function deleteVersion(vId){
   if(state.versions.length<=1){ toast("A rollout needs at least one master ticket."); return; }
   begin();
   state.versions=state.versions.filter(v=>v.id!==vId);
   Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[0]===vId) delete state.qtys[k]; });
+  Object.keys(state.tierOf).forEach(k=>{ if(k.split("::")[0]===vId) delete state.tierOf[k]; });
   sel=null; commit();
   toast("Master ticket deleted.", "Undo", undo);
 }
@@ -1390,6 +1953,7 @@ function removeAddress(aId){
   begin();
   state.addresses=state.addresses.filter(a=>a.id!==aId);
   Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[1]===aId) delete state.qtys[k]; });
+  Object.keys(state.tierOf).forEach(k=>{ if(k.split("::")[1]===aId) delete state.tierOf[k]; });
   Object.keys(state.addrValues).forEach(k=>{ if(k.split("::")[0]===aId) delete state.addrValues[k]; });
   sel=null; commit();
   toast("Address removed from the rollout.", "Undo", undo);
@@ -1400,7 +1964,76 @@ function newAddress(){
   state.addresses.push({id, name:"New address", city:"—"});
   commit();
   setSel(0, state.addresses.length-1, 0, false);
-  toast("Address added. Name it, then enter a quantity on each version it receives.", "Undo", undo);
+  toast("Address added. Name it, then enter its quantities on the distribution.", "Undo", undo);
+}
+
+/* ── Tier ops ──────────────────────────────────────────────────
+   Tiers are added, renamed and removed on the master ticket; which
+   tier an address gets is set on the distribution.
+   ------------------------------------------------------------- */
+function nextTierName(vId){
+  let n=tiersOf(vId).length+1;
+  while(findTierByName(vId, "V"+n)) n++;
+  return "V"+n;
+}
+const tierCellEl = vId => document.querySelector(`[data-table="master"] td[data-tiers="${vId}"]`);
+
+function addTier(vId){
+  const v=VER(vId); if(!v) return;
+  const first = !v.tiers.length;
+  const tier = {id:nextId("t", v.tiers), name:nextTierName(vId)};
+  begin();
+  v.tiers.push(tier);
+  /* With one tier there is only one answer, so everyone already on the
+     ticket goes on it. From the second tier on, the distribution is
+     where addresses are moved. */
+  const onIt = first ? addressesOn(vId) : [];
+  onIt.forEach(a=>setTier(vId, a.id, tier.id));
+  commit();
+  const td=tierCellEl(vId);
+  if(td) inlineRename(td, tier.name, val=>renameTier(vId, tier.id, val));
+  toast(onIt.length
+    ? `${tier.name} added. All ${onIt.length} addresses are on it until you move some on the distribution.`
+    : `${tier.name} added. Assign addresses to it on the distribution.`, "Undo", undo);
+}
+function renameTier(vId, tId, val){
+  const tier=TIER(vId, tId); if(!tier) return render();
+  const name=String(val??"").trim();
+  if(!name || name===tier.name) return render();
+  const clash=findTierByName(vId, name);
+  if(clash && clash.id!==tId){ render(); toast(`This ticket already has a version called ${clash.name}.`); return; }
+  begin(); tier.name=name; commit();
+}
+function removeTier(vId, tId){
+  const v=VER(vId), tier=TIER(vId, tId); if(!tier) return;
+  begin();
+  v.tiers=v.tiers.filter(t=>t.id!==tId);
+  Object.keys(state.tierOf).forEach(k=>{
+    if(k.split("::")[0]===vId && state.tierOf[k]===tId) delete state.tierOf[k];
+  });
+  sel=null; commit();
+  toast(`${tier.name} removed.`, "Undo", undo);
+}
+function tierMenu(e, vId, tId){
+  const tier=TIER(vId, tId), n=addressesOnTier(vId, tId).length;
+  const r=e.currentTarget.getBoundingClientRect();
+  const last = tiersOf(vId).length===1;
+  menu(r.left, r.bottom+4,
+    `<div class="mlabel">${esc(VER(vId).desc||VER(vId).job)} · ${esc(tier.name)}</div>
+     <button data-a="rename">Rename version</button>
+     <button data-a="dist">Assign on distribution</button><hr>
+     <button class="danger" data-a="del">Remove version</button>
+     <div class="mnote">${n
+       ? `${n} address${n===1?"":"es"} lose${n===1?"s":""} ${last?"it and the ticket becomes one design for everyone.":"their version and will need another."}`
+       : last ? "The ticket becomes one design for everyone." : "No addresses are on it yet."}</div>`,
+    m=>{
+      m.querySelector('[data-a="rename"]').onclick=()=>{ closeMenu();
+        const td=tierCellEl(vId);
+        if(td) inlineRename(td, tier.name, val=>renameTier(vId, tId, val));
+      };
+      m.querySelector('[data-a="dist"]').onclick=()=>{ closeMenu(); state.view="dist"; sel=null; render(); };
+      m.querySelector('[data-a="del"]').onclick=()=>{ closeMenu(); removeTier(vId, tId); };
+    });
 }
 
 function wirePencil(th, getName, setName){
@@ -1412,7 +2045,11 @@ function wirePencil(th, getName, setName){
 function inlineRename(host, cur, done){
   const inp=document.createElement("input");
   inp.className="editor"; inp.value=cur; host.appendChild(inp); inp.focus(); inp.select();
-  const fin=save=>{ const v=inp.value.trim(); inp.remove(); if(save) done(v); else render(); };
+  /* Removing the input blurs it, so Enter/Escape would finish twice
+     without the guard. */
+  let finished=false;
+  const fin=save=>{ if(finished) return; finished=true;
+    const v=inp.value.trim(); inp.remove(); if(save) done(v); else render(); };
   inp.onblur=()=>fin(true);
   inp.onkeydown=ev=>{ ev.stopPropagation();
     if(ev.key==="Enter"){ev.preventDefault();fin(true);} if(ev.key==="Escape"){ev.preventDefault();fin(false);} };
@@ -1436,7 +2073,9 @@ function toast(msg, actionLabel, action){
 /* ============================ WIRING ============================ */
 function esc(s){ return String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
 
+document.getElementById("tabOverview").onclick=()=>{ state.view="overview"; sel=null; render(); };
 document.getElementById("tabMaster").onclick=()=>{ state.view="master"; sel=null; render(); };
+document.getElementById("tabShip").onclick =()=>{ state.view="ship";   sel=null; render(); };
 document.getElementById("tabDist").onclick =()=>{ state.view="dist";   sel=null; render(); };
 
 /* The two things a finished rollout is FOR. Neither is built — each
@@ -1447,8 +2086,19 @@ document.getElementById("shipTracker").onclick=()=>{
   toast(`Ship tracker for ${lines.toLocaleString()} shipment${lines===1?"":"s"} across ${state.addresses.length} address${state.addresses.length===1?"":"es"}.`);
 };
 document.getElementById("createTickets").onclick=()=>{
+  /* A tiered ticket with an address on no tier cannot be spun off —
+     nobody has said which design that address gets. */
+  const missing=state.versions.reduce((n,v)=>n+untiered(v.id).length, 0);
+  if(missing){
+    toast(`${missing} address${missing===1?" needs":"es need"} a version first.`, "Open distribution", ()=>{
+      state.view="dist"; sel=null; render();
+    });
+    return;
+  }
   const lines=state.versions.reduce((n,v)=>n+addressesOn(v.id).length, 0);
-  toast(`${lines.toLocaleString()} ticket${lines===1?"":"s"} created from ${state.versions.length} master ticket${state.versions.length===1?"":"s"}.`);
+  const v=state.versions.find(x=>addressesOn(x.id).length);
+  const eg=v ? ` Named like "${ticketName(v.id, addressesOn(v.id)[0].id)}".` : "";
+  toast(`${lines.toLocaleString()} ticket${lines===1?"":"s"} created from ${state.versions.length} master ticket${state.versions.length===1?"":"s"}.${eg}`);
 };
 
 render();
@@ -1479,7 +2129,19 @@ render();
                                .version-pick, .select styles
            ViewTabs          → .tab-row markup here; button is the shared
                                .tab-btn, row styles in rollout-manager.css
+           BackLink          → a.rollout-back in the topbar (the shared .btn-ghost),
+                               to rollout-dashboard.html
            RolloutOutputs    → #shipTracker / #createTickets in the topbar
+           Overview          → <div class="overview"> markup, filled by
+                               renderOverview(); .overview-card, .detail-list +
+                               .detail-field, .ov-timeline + .cell-field,
+                               .product-cards / .product-card / .version-line
+                               styles. Templates: ovProductCardTemplate,
+                               ovVersionLineTemplate. Layout: the timeline and
+                               details hold still; only the product cards
+                               scroll (.overview is a flex column that does
+                               not scroll itself). The dot is
+                               components/status-dot/status-dot.css
            TableSection      → <template id="tableSectionTemplate">,
                                .grid-section + .viewhost styles; one per
                                table, cloned by renderTables()
@@ -1488,11 +2150,30 @@ render();
            ColumnReorder     → wireColumnDrag() / moveColumn(); .hd-move,
                                .hd-pinned, .grip, .is-dragging, .drop-before,
                                .drop-after styles
+           TierCell          → <template id="tierCellTemplate"> + <template
+                               id="tierChipTemplate">, filled by tierCell();
+                               .tier-cell, .tier-chip (on the shared .pill),
+                               .tier-add, .tier-missing (on .pill-warn) styles
            CellEditor        → input.editor mounted by mountEditor(), .editor styles
            ContextMenu       → built by menu(), .menu styles
            Toast             → built by toast(), .toast styles
 
          What each tab shows
+           Overview          → the default tab. Details: Rollout, Customer and CSR
+                               are edited in place (Customer is typed against
+                               ROLLOUT_CUSTOMERS and refused if not on it; CSR
+                               picks from ROLLOUT_CSRS); Sales is read from the
+                               customer (salesFor()), never entered; locations
+                               and total quantity are roll-ups. The project
+                               timeline is a sheet — the dashboard's ten
+                               milestones as columns under their departments,
+                               Target and Actual as editable date rows, and a
+                               read-only Status row from rollout-status.js,
+                               and an editable Note row. Every edit here is
+                               one undo step. The product cards are
+                               live: it follows edits on the other tabs, and
+                               lists "No version yet" for addresses on a
+                               multi-version ticket with none assigned.
            Master tickets    → a STACK of tables, because several parts can go
                                into the one piece that ships and each part has
                                its own specs.
@@ -1502,7 +2183,25 @@ render();
                                removed, and where the job header fields live
                                (JOBFIELDS, from JOB_CATALOG) beside Quantity
                                Shipping, the read-only sum of that ticket's
-                               quantities.
+                               quantities, and Versions.
+
+                               VERSIONS are content variants of one master
+                               ticket (Main Menu Card T1 / T2, To Go Menu Retro
+                               East / Core High): same specs, different art.
+                               The Versions cell shows a chip per version with
+                               its address count; + adds one, clicking a chip
+                               renames or removes it. Adding the FIRST version
+                               puts every address already on the ticket on it
+                               (the only possible answer); later ones start
+                               empty. A "N need a version" warning shows while
+                               any address with a quantity has none. A ticket
+                               with no versions is one design for everyone.
+
+         NAMING — read this before porting. The UI says "version"; the code
+         says `tier` (v.tiers, state.tierOf, tierCell(), .tier-* classes),
+         because `version` / state.versions / VER() already meant MASTER
+         TICKET in this prototype. In Angular, name them MasterTicket and
+         Version and drop both old names.
 
                                JOB_CATALOG is the JM "Edit job information"
                                modal, field for field, in its order:
@@ -1536,19 +2235,47 @@ render();
                                because the data has a detail there, and it
                                disappears when the last ticket loses it. That
                                is why nothing on these tables creates one.
-           Distribution list → every address down the side; one quantity
-                               column per version, then the JM shipping fields
-                               (SHIP_CATALOG), which are per address only.
+           Shipping          → every address down the side, then the JM
+                               shipping fields (SHIP_CATALOG), which are per
+                               address only. "+ Add field" lives here.
+           Distribution      → every address down the side; one column group
+                               per master ticket, headed by its description:
+                               Quantity, then Version if the ticket has
+                               versions. Version is a type-ahead over that
+                               ticket's version names (same autocomplete() as
+                               Job Type). A row with a quantity and no version
+                               is flagged (td.flag, "Needs version").
 
-         The distribution list IS the quantities. state.qtys is keyed
+         Distribution IS the quantities. state.qtys is keyed
          "versionId::addressId", and a quantity is also the membership
          record: receives() is "has a non-empty quantity", so there is no
          separate list of which addresses are on which version to keep in
-         step, nothing to lock, and no version to switch between.
+         step. state.tierOf uses the same key and holds a version (tier) id
+         from that master ticket's tiers array; it says which design, never
+         whether. Clearing a quantity leaves the version in place (so
+         pasting version then quantity works); it is ignored while there is
+         no quantity. A version may carry its own job number (tier.job) —
+         Famous Dave's runs every version as its own job — shown in the
+         chip's tooltip.
+
+         Spun-off tickets are named ticketName(): master, version, address —
+         "Main Menu Card - T1 - Boston", "Dessert Menu Card - Boston" —
+         matching how the client ticket list names them. Create Tickets
+         refuses while any address needs a version.
 
          Simulated in JS, becomes Angular state/events
            - All data is the in-memory `state` object; no persistence layer.
-           - View switching, version picker → component state + router params.
+           - Milestone dates and the rollout's name / customer / CSR are read
+             from the data file into state.milestones and state.rollout. The
+             dashboard keeps its own in-memory copy, so an edit on one page does
+             not reach the other — in Angular both read the same rollout from
+             the service. Customer and CSR lists are rollout-customers.js.
+           - View switching (Overview / Master tickets / Shipping / Distribution) →
+             component state + router params.
+           - Version add/rename/remove, the first-version auto-assign, and
+             the needs-a-version check → methods on the rollout service. A
+             pasted version name that is not on the ticket is ignored, not
+             refused with a message; typing is validated.
            - The type-ahead is autocomplete() — inline completion, a filtered
              list on <body> (a cell clips its own overflow), arrow keys, and
              a commit that refuses a value not on the list. Swap for the
@@ -1583,10 +2310,16 @@ render();
              real domain logic and should move to a service as written.
 
          Only there to make the prototype demonstrable
-           - Seed data in rollout-data.js (a real rollout: Fogo de Chao
-             0929, six master tickets x 94 locations). window.ROLLOUT_DATA
-             feeds state and SPECS; the header reads rollout.customer and
-             rollout.name. Replace with an API response.
+           - Seed data: three rollout files, each registering in
+             window.ROLLOUTS by id — rollout-data-puttshack.js (3 master
+             tickets x 20 locations, versions T1/T2), rollout-data-famous-
+             daves.js (8 master tickets x 42 locations, up to 7 versions,
+             from the job ticket PDF) and rollout-data.js (Fogo de Chao,
+             6 tickets x 94 locations, no versions). A script in <head>
+             picks one from ?rollout= into window.ROLLOUT_DATA, which feeds
+             state and SPECS; the header reads rollout.customer and
+             rollout.name. In Angular: a route param and an API call.
+           - The "Rollouts" breadcrumb goes to rollout-dashboard.html.
            - toast() and its 5.2s timer.
            - inlineRename() reusing .editor for header renames.
          ══════════════════════════════════════════════════════════ -->

@@ -1,0 +1,23 @@
+/* ============================================================
+   Status dot — milestone status, shared by the rollout dashboard
+   and the Rollout Manager's Overview tab.
+   ------------------------------------------------------------
+   <span class="status-dot status-dot--done"></span>
+   Modifiers match RolloutStatus.milestoneStatus() states:
+   done, due, late (filled), upcoming, empty (hollow).
+
+   Depends on: shared/css/design-tokens.css
+   ============================================================ */
+.status-dot {
+  flex: none;
+  display: inline-block;
+  width: var(--scale-200);
+  height: var(--scale-200);
+  border-radius: var(--border-radius-full);
+  border: 1.5px solid transparent;
+}
+.status-dot--done     { background: var(--status-success-border); }
+.status-dot--due      { background: var(--status-warning-border); }
+.status-dot--late     { background: var(--status-error-border); }
+.status-dot--upcoming { border-color: var(--border-default); }
+.status-dot--empty    { border-color: var(--border-tertiary); }

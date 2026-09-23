@@ -1,0 +1,598 @@
+/* ============================================================
+   Rollout dashboard — page styles
+   ------------------------------------------------------------
+   Every value comes from shared/css/design-tokens.css. The app
+   shell rules repeat the ones in rollout-manager.css so this page
+   does not pull in the grid's global table styles.
+
+   Order matches the markup: Local tokens → App shell → Topbar
+   → View toggle
+   → Status legend → Rollout list → Sticky column → Rollout row
+   → Milestone groups → Milestone cell → Group summary
+   → Gantt → Milestone flyout → Fields → Utilities
+   ============================================================ */
+
+/* ── Local tokens ──────────────────────────────────────────────
+   Column geometry, plus the two flyout values the shared flyout
+   expects the page to declare (same values as inventory.css).
+   ------------------------------------------------------------- */
+:root {
+  --dash-col-client: 280px;
+  --dash-col-products: 120px;
+  --dash-col-locs: 84px;
+  --dash-col-qty: 88px;
+  --dash-col-milestone: 96px;
+  --dash-head-row: var(--scale-900);
+
+  /* Gantt geometry: the label column, the narrowest a day may get,
+     and the least height of a rollout's track. */
+  --gantt-label: 280px;
+  --gantt-day-min: 44px;
+  --gantt-row: var(--scale-900);
+
+  --shadow-panel: -4px 0 24px rgb(from var(--color-black) r g b / .15);
+  --duration-panel: .2s;
+}
+
+* { box-sizing: border-box; }
+
+/* ── App shell ─────────────────────────────────────────────── */
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family-primary);
+  font-size: var(--fontsize-body-sm);
+  line-height: var(--line-height-body-sm);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.breadcrumbs { max-width: none; }
+
+/* ══ Topbar ═══════════════════════════════════════════════════ */
+.dash-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--scale-400);
+  padding: var(--scale-200) var(--scale-800);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-tertiary);
+}
+.dash-title {
+  margin: 0;
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-semibold);
+}
+.dash-title__count {
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-light);
+}
+
+/* ── View toggle ───────────────────────────────────────────────
+   Two joined buttons; the pressed one is filled.
+   ------------------------------------------------------------- */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+.view-toggle__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--scale-100);
+  padding: var(--scale-100) var(--scale-300);
+  border: 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.view-toggle__btn + .view-toggle__btn { border-left: 1px solid var(--border-subtle); }
+.view-toggle__btn:hover:not(.is-active) { background: var(--bg-muted); }
+.view-toggle__btn.is-active { background: var(--interactive-default); color: var(--color-white); }
+.view-toggle__btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+.dash-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-400);
+  padding: var(--scale-500) var(--scale-800) var(--scale-800);
+}
+
+/* ══ Status legend ════════════════════════════════════════════ */
+.status-legend {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--scale-400);
+  color: var(--text-secondary);
+}
+.status-legend__items {
+  display: flex;
+  gap: var(--scale-500);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.status-legend__item { display: inline-flex; align-items: center; gap: var(--scale-100); }
+.status-legend__hint { margin: 0; color: var(--text-tertiary); }
+
+/* The dot itself is components/status-dot/status-dot.css. */
+
+/* ══ Rollout list ═════════════════════════════════════════════ */
+/* The box that scrolls both ways; its border frames the table. */
+.rollout-scroller {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-md);
+}
+
+/* Auto layout so a collapsed group's hidden columns drop out
+   cleanly; the widths below are held with width + min-width. */
+.rollout-list {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.rollout-list .col-client   { width: var(--dash-col-client);   min-width: var(--dash-col-client);   max-width: var(--dash-col-client); }
+.rollout-list .col-products { width: var(--dash-col-products); min-width: var(--dash-col-products); }
+.rollout-list .col-locs     { width: var(--dash-col-locs);     min-width: var(--dash-col-locs); }
+.rollout-list .col-qty      { width: var(--dash-col-qty);      min-width: var(--dash-col-qty); }
+.rollout-list .milestone-head,
+.rollout-list .milestone-summary-head,
+.rollout-list td.milestone,
+.rollout-list td.milestone-summary { width: var(--dash-col-milestone); min-width: var(--dash-col-milestone); }
+
+.rollout-list > thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-subtle);
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  padding: var(--scale-200) var(--scale-300);
+  border-bottom: 1px solid var(--border-tertiary);
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.rollout-list > thead tr:first-child th { height: var(--dash-head-row); }
+.rollout-list > thead tr:nth-child(2) th { top: var(--dash-head-row); }
+.rollout-list .num { text-align: right; }
+
+/* A department's first column carries the rule that separates it
+   from the one before. */
+.rollout-list .group-start { border-left: 1px solid var(--border-tertiary); }
+
+/* ── Sticky column ─────────────────────────────────────────────
+   Customer / Rollout stays put while the milestones scroll. A sticky
+   cell needs its own background.
+   ------------------------------------------------------------- */
+.rollout-list .is-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  box-shadow: 1px 0 0 var(--border-tertiary);
+}
+.rollout-list > thead th.is-sticky { z-index: 3; background: var(--bg-subtle); }
+
+/* ══ Rollout row ══════════════════════════════════════════════ */
+.rollout-row > td {
+  padding: var(--scale-200) var(--scale-300);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-tertiary);
+}
+
+/* Customer / Rollout: the customer carries the weight, the rollout
+   name (a link into it) comes second, CSR and Sales last and quiet. */
+.rollout-row__customer {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.rollout-row__sub {
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-200);
+  min-width: 0;
+}
+.rollout-row__name {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-interactive);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+.rollout-row__name:hover { text-decoration: underline; }
+.rollout-row__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+}
+.rollout-row__meta[hidden] { display: none; }
+
+/* Products: how many, and how many versions. The breakdown is on
+   the rollout's Overview tab. */
+.rollout-row__products > span { display: block; }
+.rollout-row__version-count { color: var(--text-tertiary); }
+
+.rollout-row__total { font-weight: var(--font-weight-semibold); }
+
+/* ══ Milestone groups ═════════════════════════════════════════
+   Each department header is a button that collapses its columns
+   to one Progress column.
+   ───────────────────────────────────────────────────────────── */
+.rollout-list > thead th.milestone-group { vertical-align: middle; }
+.milestone-group__toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--scale-200);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.milestone-group__toggle i {
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+  transition: transform .15s ease;
+}
+.milestone-group.is-collapsed .milestone-group__toggle i { transform: rotate(-90deg); }
+.milestone-group__toggle:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.milestone-group__owner { color: var(--text-tertiary); font-weight: var(--font-weight-light); }
+/* A collapsed group is one narrow column; its name is enough. */
+.milestone-group.is-collapsed .milestone-group__owner { display: none; }
+
+.rollout-list > thead th.milestone-head,
+.rollout-list > thead th.milestone-summary-head {
+  white-space: normal;
+  line-height: var(--line-height-label);
+}
+
+/* ══ Milestone cell ═══════════════════════════════════════════
+   Dot + date over a one-line status. The fill says it at a glance:
+   red for late, copper for due soon, nothing otherwise.
+   ───────────────────────────────────────────────────────────── */
+.rollout-row > td.milestone { padding: var(--scale-100); }
+
+.ms-cell {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-25);
+  width: 100%;
+  padding: var(--scale-100) var(--scale-200);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ms-cell:hover { border-color: var(--border-subtle); }
+.ms-cell:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 0; }
+
+.ms-cell__top { display: flex; align-items: center; gap: var(--scale-100); }
+.ms-cell__date { font-weight: var(--font-weight-semibold); }
+.ms-cell__note { color: var(--text-tertiary); font-size: var(--fontsize-label); }
+.ms-cell__note[hidden] { display: none; }
+.ms-cell__sub {
+  color: var(--text-tertiary);
+  font-size: var(--fontsize-label);
+  line-height: var(--line-height-label);
+  white-space: nowrap;
+}
+
+/* States. Late and due sub-text is --text-primary, not red: see the
+   token note in the implementation notes. */
+td.is-late .ms-cell { background: var(--status-error-bg); }
+td.is-due  .ms-cell { background: var(--status-warning-bg); }
+td.is-late .ms-cell__sub,
+td.is-due  .ms-cell__sub { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+td.is-upcoming .ms-cell__date { font-weight: var(--font-weight-book); color: var(--text-secondary); }
+td.is-empty .ms-cell__date { color: var(--border-subtle); font-weight: var(--font-weight-light); }
+td.is-empty .ms-cell__sub { visibility: hidden; }
+td.is-empty .ms-cell:hover .ms-cell__sub { visibility: visible; color: var(--text-interactive); }
+
+/* The cell whose flyout is open. */
+td.is-selected .ms-cell {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+
+/* ── Group summary ─────────────────────────────────────────── */
+.rollout-row > td.milestone-summary { white-space: nowrap; }
+.milestone-summary { color: var(--text-secondary); }
+.milestone-summary .status-dot { margin-right: var(--scale-100); vertical-align: middle; }
+
+/* ══ Gantt ════════════════════════════════════════════════════
+   One grid: the label column and 21 day columns. Header rows 1–2
+   stick; tracks are subgrids so bars and dots take day columns.
+   ───────────────────────────────────────────────────────────── */
+.gantt-scroller {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-md);
+}
+.gantt-scroller[hidden] { display: none; }
+
+.gantt {
+  display: grid;
+  grid-template-columns: var(--gantt-label) repeat(21, minmax(var(--gantt-day-min), 1fr));
+  /* Sized by its columns, not by marker labels (which may run over
+     the following days); below this it scrolls sideways. */
+  min-width: calc(var(--gantt-label) + 21 * var(--gantt-day-min));
+  position: relative;
+}
+
+/* Header */
+.gantt__corner,
+.gantt__week,
+.gantt__day {
+  position: sticky;
+  z-index: 3;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-tertiary);
+}
+.gantt__corner { grid-column: 1; grid-row: 1; top: 0; left: 0; z-index: 4; }
+.gantt__corner--days { grid-row: 2; top: var(--dash-head-row); }
+.gantt__week {
+  grid-row: 1;
+  top: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--scale-200);
+  height: var(--dash-head-row);
+  padding: var(--scale-200) var(--scale-300);
+  border-left: 1px solid var(--border-tertiary);
+}
+.gantt__week-name { font-weight: var(--font-weight-semibold); }
+.gantt__week-range { color: var(--text-tertiary); }
+.gantt__day {
+  grid-row: 2;
+  top: var(--dash-head-row);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--scale-100) 0;
+  color: var(--text-secondary);
+  font-size: var(--fontsize-label);
+  line-height: var(--line-height-label);
+}
+.gantt__day.is-week-start { border-left: 1px solid var(--border-tertiary); }
+.gantt__day-num { font-size: var(--fontsize-body-sm); font-weight: var(--font-weight-medium); color: var(--text-primary); }
+.gantt__day.is-weekend { background: var(--bg-muted); }
+.gantt__day.is-today { background: var(--interactive-default); color: var(--color-white); }
+.gantt__day.is-today .gantt__day-num { color: var(--color-white); }
+
+/* Column shading behind the body */
+.gantt__shade { z-index: 0; pointer-events: none; }
+.gantt__shade--weekend { background: var(--bg-muted); }
+.gantt__shade--today {
+  background: var(--interactive-bg-subtle);
+  box-shadow: inset 1px 0 0 var(--interactive-default), inset -1px 0 0 var(--interactive-default);
+}
+
+/* Label column — sticks while the days scroll sideways. */
+.gantt__rollout {
+  grid-column: 1;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-surface);
+  box-shadow: 1px 0 0 var(--border-tertiary);
+}
+.gantt__rollout {
+  padding: var(--scale-300);
+  border-top: 1px solid var(--border-tertiary);
+  min-width: 0;
+}
+/* Same order as the table: customer first, rollout second. */
+.gantt__rollout-customer {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.gantt__rollout-name {
+  display: block;
+  color: var(--text-interactive);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+.gantt__rollout-name:hover { text-decoration: underline; }
+
+/* A rollout's track: a subgrid over the 21 day columns. Bars and
+   markers share its one row. */
+.gantt__track {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  min-height: var(--gantt-row);
+  border-top: 1px solid var(--border-tertiary);
+}
+
+/* A department's span, first to last milestone. A cut end fades out
+   to say it carries on past the window. */
+.gantt__bar {
+  grid-row: 1;
+  height: var(--scale-400);
+  margin-inline: var(--scale-200);
+  border-radius: var(--border-radius-full);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-tertiary);
+}
+.gantt__bar[hidden] { display: none; }
+.gantt__bar.is-cut-start { margin-left: 0; border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.gantt__bar.is-cut-end { margin-right: 0; border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* A milestone: a white pill on the bar — dot centred on its day,
+   label running on after it. Subtle border at rest; on hover the
+   border and fill take the status colours (upcoming uses neutral). */
+.gantt__marker {
+  --marker-status: var(--border-default);
+  --marker-status-bg: var(--status-neutral-bg);
+  grid-row: 1;
+  justify-self: start;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--scale-100);
+  padding: var(--scale-25) var(--scale-200) var(--scale-25) var(--scale-100);
+  /* Puts the dot (after the padding) on the day's centre; the label
+     runs on to the right, over the next days. */
+  margin-left: calc(50% - var(--scale-200));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-full);
+  background: var(--bg-surface);
+  font: inherit;
+  font-size: var(--fontsize-label);
+  line-height: var(--line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 90ms linear, background-color 90ms linear;
+}
+.gantt__marker.is-done { --marker-status: var(--status-success-border); --marker-status-bg: var(--status-success-bg); }
+.gantt__marker.is-due  { --marker-status: var(--status-warning-border); --marker-status-bg: var(--status-warning-bg); }
+.gantt__marker.is-late { --marker-status: var(--status-error-border);   --marker-status-bg: var(--status-error-bg); }
+.gantt__marker:hover { border-color: var(--marker-status); background: var(--marker-status-bg); z-index: 2; }
+.gantt__marker:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; z-index: 2; }
+/* While its flyout is open, the pill keeps the hover state. */
+.gantt__marker.is-selected { border-color: var(--marker-status); background: var(--marker-status-bg); box-shadow: 0 0 0 1px var(--marker-status); z-index: 2; }
+@media (prefers-reduced-motion: reduce) {
+  .gantt__marker { transition: none; }
+}
+
+/* Counts of milestones outside the window, at the edges. */
+.gantt__more {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  font-size: var(--fontsize-label);
+  background: var(--bg-surface);
+  padding: 0 var(--scale-100);
+}
+.gantt__more[hidden] { display: none; }
+.gantt__more--before { left: var(--scale-100); }
+.gantt__more--after { right: var(--scale-100); }
+
+/* ══ Milestone flyout ═════════════════════════════════════════
+   The shared flyout, narrower: three fields do not need the
+   640px aside width.
+   ───────────────────────────────────────────────────────────── */
+.flyout-panel--narrow { width: var(--container-sidebar); }
+
+.milestone-flyout__heading { display: flex; flex-direction: column; gap: var(--scale-50); }
+.milestone-flyout__context { color: var(--text-tertiary); }
+.milestone-flyout__hint { color: var(--text-tertiary); }
+.milestone-flyout__actions { display: flex; gap: var(--scale-300); }
+
+/* ── Fields ────────────────────────────────────────────────────
+   Same names and values as inventory.css (.field, .field-label,
+   .field-pair, .input).
+   ------------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: var(--scale-50); }
+.field-label {
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+}
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--scale-300);
+}
+/* A label with an action at its trailing edge — Actual / Today. */
+.field-label-row { display: flex; align-items: baseline; justify-content: space-between; }
+
+.input {
+  height: var(--scale-800);
+  padding: 0 var(--scale-200);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+}
+.input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
+.input--area {
+  height: auto;
+  padding: var(--scale-200);
+  resize: vertical;
+  line-height: var(--line-height-body-sm);
+}
+
+/* A text-only action. */
+.link-btn {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fontsize-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-interactive);
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; }
+
+/* ── Utilities ─────────────────────────────────────────────── */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rollouts</title>
+    <script src="https://kit.fontawesome.com/da08280601.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="shared/css/design-tokens.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
+    <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
+    <link rel="stylesheet" href="components/flyout/flyout.css" />
+    <link rel="stylesheet" href="components/status-dot/status-dot.css" />
+    <link rel="stylesheet" href="rollout-dashboard.css" />
+
+    <!-- The same seed files the Rollout Manager loads. Each registers
+         itself in window.ROLLOUTS by id. -->
+    <script src="rollout-data-puttshack.js"></script>
+    <script src="rollout-data-famous-daves.js"></script>
+    <script src="rollout-data.js"></script>
+    <!-- Milestone status rules, shared with the Rollout Manager. -->
+    <script src="rollout-status.js"></script>
+    <script>
+      window.SIDEBAR_CONFIG = {
+        activeItem: 'Jobs',
+        user: { name: 'Healey Pembridge', role: 'ui/ux designer' }
+      };
+    </script>
+  </head>
+  <body>
+    <script src="shared/components/sidebar-component.js"></script>
+
+    <div class="main-content">
+
+      <!-- ══ Breadcrumb bar ═══════════════════════════════════ -->
+      <div class="breadcrumb-bar">
+        <nav class="breadcrumbs">
+          <a class="crumb" href="#"><i class="fa-regular fa-folder"></i> Jobs</a>
+          <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
+          <span class="crumb current">Rollouts</span>
+        </nav>
+      </div>
+
+      <!-- ══ Topbar ═══════════════════════════════════════════ -->
+      <header class="dash-topbar">
+        <h1 class="dash-title">Rollouts <span class="dash-title__count" id="rolloutCount"></span></h1>
+        <!-- View switch: the milestone table, or the three-week Gantt.
+             aria-pressed marks the current one. -->
+        <div class="view-toggle" role="group" aria-label="View">
+          <button class="view-toggle__btn is-active" type="button" data-view="table" aria-pressed="true">
+            <i class="fa-regular fa-table" aria-hidden="true"></i> Table
+          </button>
+          <button class="view-toggle__btn" type="button" data-view="gantt" aria-pressed="false">
+            <i class="fa-regular fa-chart-gantt" aria-hidden="true"></i> Gantt
+          </button>
+        </div>
+      </header>
+      <!-- ══ /Topbar ══════════════════════════════════════════ -->
+
+      <main class="dash-body">
+
+        <!-- ══ Status legend ══════════════════════════════════
+             What the dot and fill on a milestone cell mean. The same
+             .status-dot modifiers are used in the cells.
+             ─────────────────────────────────────────────────── -->
+        <div class="status-legend">
+          <ul class="status-legend__items">
+            <li class="status-legend__item"><span class="status-dot status-dot--done"></span> Done</li>
+            <li class="status-legend__item"><span class="status-dot status-dot--due"></span> Due within 3 days</li>
+            <li class="status-legend__item"><span class="status-dot status-dot--late"></span> Late</li>
+            <li class="status-legend__item"><span class="status-dot status-dot--upcoming"></span> Upcoming</li>
+          </ul>
+          <p class="status-legend__hint" data-hint="table">Cells show the actual date when done, otherwise the target. Click a cell to edit.</p>
+          <p class="status-legend__hint" data-hint="gantt" hidden>Each dot sits on the actual date when done, otherwise the target. Click one to edit.</p>
+        </div>
+        <!-- ══ /Status legend ═════════════════════════════════ -->
+
+        <!-- ══ Rollout list ═══════════════════════════════════
+             One row per rollout: who it is, how big it is, then one
+             cell per milestone, grouped by department. The per-version
+             breakdown lives on the rollout's Overview tab, not here.
+             Each department group collapses to a single progress
+             column from the chevron in its header.
+
+             The <th data-milestone> cells in header row 2 are the one
+             list of milestones — the row cells are built from them.
+             ─────────────────────────────────────────────────── -->
+        <div class="rollout-scroller">
+          <table class="rollout-list">
+            <thead>
+              <!-- Row 1: fixed columns span both rows; each department
+                   spans its milestones. -->
+              <tr>
+                <th scope="col" rowspan="2" class="col-client is-sticky">Customer / Rollout</th>
+                <th scope="col" rowspan="2" class="col-products">Products</th>
+                <th scope="col" rowspan="2" class="col-locs num">Locations</th>
+                <th scope="col" rowspan="2" class="col-qty num">Total qty</th>
+
+                <th scope="colgroup" colspan="4" class="milestone-group group-start" data-group-head="pre">
+                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="pre">
+                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
+                    <span class="milestone-group__name">Pre-Production</span>
+                    <span class="milestone-group__owner">CSR / PrePress</span>
+                  </button>
+                </th>
+                <th scope="colgroup" colspan="3" class="milestone-group group-start" data-group-head="print">
+                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="print">
+                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
+                    <span class="milestone-group__name">Print Production</span>
+                  </button>
+                </th>
+                <th scope="colgroup" colspan="1" class="milestone-group group-start" data-group-head="ship">
+                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="ship">
+                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
+                    <span class="milestone-group__name">Shipping</span>
+                  </button>
+                </th>
+                <th scope="colgroup" colspan="2" class="milestone-group group-start" data-group-head="acct">
+                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="acct">
+                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
+                    <span class="milestone-group__name">Accounting</span>
+                  </button>
+                </th>
+              </tr>
+
+              <!-- Row 2: one per milestone (data-milestone is the key
+                   dates are stored under), plus a hidden Progress
+                   column per group that shows while it is collapsed. -->
+              <tr>
+                <th scope="col" class="milestone-head group-start" data-group="pre" data-milestone="filesReceived">Files Received</th>
+                <th scope="col" class="milestone-head" data-group="pre" data-milestone="tickets">Tickets</th>
+                <th scope="col" class="milestone-head" data-group="pre" data-milestone="initialProofOut">Initial Proof Out</th>
+                <th scope="col" class="milestone-head" data-group="pre" data-milestone="filesApproved">Files Approved</th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="pre" hidden>Progress</th>
+
+                <th scope="col" class="milestone-head group-start" data-group="print" data-milestone="printed">Printed</th>
+                <th scope="col" class="milestone-head" data-group="print" data-milestone="cut">Cut</th>
+                <th scope="col" class="milestone-head" data-group="print" data-milestone="finishing">Finishing</th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="print" hidden>Progress</th>
+
+                <th scope="col" class="milestone-head group-start" data-group="ship" data-milestone="shipDate">Ship Date</th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="ship" hidden>Progress</th>
+
+                <th scope="col" class="milestone-head group-start" data-group="acct" data-milestone="billingPrep">Billing Prep</th>
+                <th scope="col" class="milestone-head" data-group="acct" data-milestone="billingCompleted">Billing Done</th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="acct" hidden>Progress</th>
+              </tr>
+            </thead>
+            <tbody id="rolloutRows"></tbody>
+          </table>
+        </div>
+        <!-- ══ /Rollout list ══════════════════════════════════ -->
+
+        <!-- ══ Gantt ══════════════════════════════════════════
+             Last week, this week and next week, Monday to Sunday — 21
+             day columns. One row per rollout — milestones run in sequence,
+             so they share a single track. Each department's bar runs from
+             its first to its last milestone date; each milestone is a dot
+             on its date (actual if done, else target) that opens the
+             flyout. Milestones outside the window are counted at the edge.
+
+             One CSS grid: a label column and 21 day columns (.gantt).
+             The header cells and rollout rows are cloned from the gantt*
+             templates by renderGantt(); the day grid lives in CSS.
+             ─────────────────────────────────────────────────── -->
+        <div class="gantt-scroller" id="ganttView" hidden>
+          <div class="gantt" id="gantt">
+            <!-- Row 1: week labels -->
+            <div class="gantt__corner" aria-hidden="true"></div>
+            <!-- ganttWeekTemplate × 3 -->
+            <!-- Row 2: day labels -->
+            <!-- ganttDayTemplate × 21 -->
+            <!-- Then one ganttRolloutTemplate per rollout -->
+          </div>
+        </div>
+        <!-- ══ /Gantt ═════════════════════════════════════════ -->
+
+      </main>
+    </div>
+
+    <!-- ══ Templates ══════════════════════════════════════════
+         rolloutRowTemplate   → the <tr> for one rollout
+         milestoneCellTemplate→ one milestone on one rollout
+         groupSummaryTemplate → a collapsed department's progress cell
+         ──────────────────────────────────────────────────────── -->
+    <template id="rolloutRowTemplate">
+      <tr class="rollout-row">
+        <td class="col-client rollout-row__client is-sticky">
+          <!-- Customer leads; the rollout (a link to it) and who is on it
+               follow on one quieter line. -->
+          <span class="rollout-row__customer"></span>
+          <span class="rollout-row__sub">
+            <a class="rollout-row__name" href="#"></a>
+            <span class="rollout-row__meta"></span>
+          </span>
+        </td>
+        <td class="col-products rollout-row__products">
+          <span class="rollout-row__product-count"></span>
+          <span class="rollout-row__version-count"></span>
+        </td>
+        <td class="col-locs num rollout-row__locations"></td>
+        <td class="col-qty num rollout-row__total"></td>
+        <!-- milestone and group-summary cells go here, in header order -->
+      </tr>
+
+    </template>
+
+    <!-- The cell IS the button that opens the flyout. Status comes from
+         a modifier on the <td>: is-done, is-due, is-late, is-upcoming,
+         is-empty; is-selected while its flyout is open. -->
+    <template id="milestoneCellTemplate">
+      <td class="milestone">
+        <button class="ms-cell" type="button">
+          <span class="ms-cell__top">
+            <span class="status-dot"></span>
+            <span class="ms-cell__date"></span>
+            <i class="fa-regular fa-comment ms-cell__note" aria-hidden="true" hidden></i>
+          </span>
+          <span class="ms-cell__sub"></span>
+        </button>
+      </td>
+    </template>
+
+    <template id="groupSummaryTemplate">
+      <td class="milestone-summary group-start" hidden>
+        <span class="status-dot"></span>
+        <span class="milestone-summary__text"></span>
+      </td>
+    </template>
+
+
+
+    <!-- ── Gantt templates ─────────────────────────────────── -->
+    <template id="ganttWeekTemplate">
+      <div class="gantt__week">
+        <span class="gantt__week-name"></span>
+        <span class="gantt__week-range"></span>
+      </div>
+    </template>
+
+    <template id="ganttDayTemplate">
+      <div class="gantt__day">
+        <span class="gantt__day-name"></span>
+        <span class="gantt__day-num"></span>
+      </div>
+    </template>
+
+    <!-- One rollout: customer and rollout in the label column, then one
+         track holding every milestone — they run in sequence, so one
+         line is enough. A bar per department sits under the dots; the
+         off-window counts sit at the track's edges. -->
+    <template id="ganttRolloutTemplate">
+      <div class="gantt__rollout">
+        <span class="gantt__rollout-customer"></span>
+        <a class="gantt__rollout-name" href="#"></a>
+      </div>
+      <div class="gantt__track">
+        <!-- ganttBarTemplate × departments, then ganttMarkerTemplate × milestones -->
+        <span class="gantt__more gantt__more--before" hidden></span>
+        <span class="gantt__more gantt__more--after" hidden></span>
+      </div>
+    </template>
+
+    <!-- A department's span on the track, first to last milestone. -->
+    <template id="ganttBarTemplate">
+      <span class="gantt__bar"></span>
+    </template>
+
+    <template id="ganttMarkerTemplate">
+      <button class="gantt__marker" type="button">
+        <span class="status-dot"></span>
+        <span class="gantt__marker-label"></span>
+      </button>
+    </template>
+    <!-- ══ /Templates ═════════════════════════════════════════ -->
+
+    <!-- ══ Milestone flyout ═══════════════════════════════════
+         The shared flyout (components/flyout/flyout.css), narrowed
+         with .flyout-panel--narrow. Fields use the inventory .field /
+         .field-label / .input names. Enter saves, Esc cancels.
+         ──────────────────────────────────────────────────────── -->
+    <div class="flyout-overlay" id="milestoneFlyout">
+      <div class="flyout-panel flyout-panel--narrow" role="dialog" aria-modal="true" aria-labelledby="milestoneFlyoutTitle">
+
+        <div class="flyout-header">
+          <div class="milestone-flyout__heading">
+            <span class="flyout-title" id="milestoneFlyoutTitle"></span>
+            <span class="milestone-flyout__context" id="milestoneFlyoutContext"></span>
+          </div>
+          <button class="icon-btn" type="button" data-close aria-label="Close">
+            <i class="fa-regular fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="flyout-body">
+          <div class="field-pair">
+            <div class="field">
+              <label class="field-label" for="milestoneTarget">Target</label>
+              <input class="input" id="milestoneTarget" type="date" />
+            </div>
+            <div class="field">
+              <div class="field-label-row">
+                <label class="field-label" for="milestoneActual">Actual</label>
+                <button class="link-btn" type="button" id="milestoneToday">Today</button>
+              </div>
+              <input class="input" id="milestoneActual" type="date" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="milestoneNote">Note</label>
+            <textarea class="input input--area" id="milestoneNote" rows="3"></textarea>
+          </div>
+        </div>
+
+        <div class="flyout-footer">
+          <span class="milestone-flyout__hint">Enter saves · Esc cancels</span>
+          <div class="milestone-flyout__actions">
+            <button class="btn-secondary" type="button" data-close>Cancel</button>
+            <button class="btn-primary" type="button" id="milestoneSave">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- ══ /Milestone flyout ══════════════════════════════════ -->
+
+    <script>
+    "use strict";
+    /* ============================================================
+       Prototype behaviour only: read the seed rollouts, fill the
+       templates, work out each milestone's status, run the flyout.
+       summarize() and milestoneStatus() are the real logic and
+       belong in a service.
+       ============================================================ */
+
+    const ROLLOUTS = Object.values(window.ROLLOUTS || {});
+    const fmt = n => n.toLocaleString();
+    const num = v => { const n = parseFloat(String(v ?? "").replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; };
+
+    /* Status rules live in rollout-status.js (shared with the
+       Rollout Manager's Overview tab). */
+    const { TODAY, toISO, shortDate, milestoneStatus, STATES, SEVERITY } = window.RolloutStatus;
+
+    /* The milestone list, read from header row 2. */
+    const MILESTONES = [...document.querySelectorAll("th[data-milestone]")]
+      .map(th => ({ key: th.dataset.milestone, label: th.textContent.trim(), group: th.dataset.group }));
+    const GROUP_NAMES = Object.fromEntries([...document.querySelectorAll("[data-group-toggle]")]
+      .map(b => [b.dataset.groupToggle, b.querySelector(".milestone-group__name").textContent.trim()]));
+
+    /* Dates per rollout per milestone, {target, actual, note}, ISO
+       dates. Seeded from rollout.milestones; in memory only. */
+    const milestones = {};
+    ROLLOUTS.forEach(d => { const r = d.rollout || {};
+      milestones[r.id] = JSON.parse(JSON.stringify(r.milestones || {})); });
+
+    /* ── Roll-ups ────────────────────────────────────────────────
+       A rollout's master tickets are its products. A product with
+       versions splits its quantity by version (tierOf); a product
+       with none is one version for every location.
+       ------------------------------------------------------------ */
+    function summarize(data){
+      const qtys = data.qtys || {}, tierOf = data.tierOf || {};
+      const onProduct = pId => Object.keys(qtys)
+        .filter(k => k.split("::")[0] === pId && String(qtys[k]).trim() !== "");
+      const products = (data.versions || []).map(p => {
+        const keys = onProduct(p.id);
+        const versions = (p.tiers && p.tiers.length)
+          ? p.tiers.map(t => {
+              const mine = keys.filter(k => tierOf[k] === t.id);
+              return { name: t.name, job: t.job || "", locations: mine.length,
+                       qty: mine.reduce((n, k) => n + num(qtys[k]), 0) };
+            })
+          : [{ name: "", job: p.job, locations: keys.length,
+               qty: keys.reduce((n, k) => n + num(qtys[k]), 0) }];
+        return { name: p.desc || p.job, versions, locations: keys.length,
+                 total: keys.reduce((n, k) => n + num(qtys[k]), 0) };
+      });
+      const locations = new Set(Object.keys(qtys)
+        .filter(k => String(qtys[k]).trim() !== "").map(k => k.split("::")[1])).size;
+      return { products, locations,
+               versions: products.reduce((n, p) => n + p.versions.length, 0),
+               total: products.reduce((n, p) => n + p.total, 0) };
+    }
+
+    /* ── Render ──────────────────────────────────────────────── */
+    const tpl = id => document.getElementById(id).content;
+    const set = (root, sel, text) => { root.querySelector(sel).textContent = text; };
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const rowsHost = document.getElementById("rolloutRows");
+    const collapsed = new Set();
+
+    ROLLOUTS.forEach(data => {
+      const r = data.rollout || {};
+      const s = summarize(data);
+      const frag = tpl("rolloutRowTemplate").cloneNode(true);
+      const row = frag.querySelector("tr.rollout-row");
+      row.dataset.rollout = r.id;
+
+      const name = row.querySelector(".rollout-row__name");
+      name.textContent = r.name || "Rollout";
+      name.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
+      const cust = row.querySelector(".rollout-row__customer");
+      cust.textContent = r.customer || "—"; cust.title = r.customer || "";
+      const meta = [r.csr && "CSR " + r.csr, r.sales && "Sales " + r.sales].filter(Boolean).join(" · ");
+      const metaEl = row.querySelector(".rollout-row__meta");
+      metaEl.textContent = meta; metaEl.title = meta; metaEl.hidden = !meta;
+      set(row, ".rollout-row__product-count", plural(s.products.length, "product"));
+      set(row, ".rollout-row__version-count", plural(s.versions, "version"));
+      set(row, ".rollout-row__locations", fmt(s.locations));
+      set(row, ".rollout-row__total", fmt(s.total));
+
+      /* Milestone cells, then a summary cell after each group. */
+      MILESTONES.forEach((ms, i) => {
+        const td = tpl("milestoneCellTemplate").firstElementChild.cloneNode(true);
+        td.dataset.milestone = ms.key;
+        td.dataset.group = ms.group;
+        if (i === 0 || MILESTONES[i - 1].group !== ms.group) td.classList.add("group-start");
+        td.querySelector(".ms-cell").addEventListener("click", () => openFlyout(r, ms, td));
+        row.appendChild(td);
+        paintCell(td, r, ms);
+        const next = MILESTONES[i + 1];
+        if (!next || next.group !== ms.group){
+          const sum = tpl("groupSummaryTemplate").firstElementChild.cloneNode(true);
+          sum.dataset.group = ms.group;
+          sum.dataset.summary = ms.group;
+          row.appendChild(sum);
+        }
+      });
+      paintSummaries(row, r);
+
+
+      rowsHost.appendChild(frag);
+    });
+    document.getElementById("rolloutCount").textContent = ROLLOUTS.length;
+
+    function paintCell(td, r, ms){
+      const m = milestones[r.id][ms.key] || {};
+      const st = milestoneStatus(m);
+      STATES.forEach(x => td.classList.toggle("is-" + x, st.state === x));
+      td.querySelector(".status-dot").className = "status-dot status-dot--" + st.state;
+      set(td, ".ms-cell__date", shortDate(st.date) || "—");
+      set(td, ".ms-cell__sub", st.sub);
+      td.querySelector(".ms-cell__note").hidden = !m.note;
+      const btn = td.querySelector(".ms-cell");
+      btn.title = m.note || "";
+      btn.setAttribute("aria-label",
+        `${ms.label}, ${r.name}: ${st.state === "empty" ? "no dates" : shortDate(st.date) + ", " + st.sub}${m.note ? ", has a note" : ""}. Edit.`);
+    }
+
+    /* A collapsed group's cell: how many are done, and the worst
+       status among the rest. */
+    function paintSummaries(row, r){
+      row.querySelectorAll("td[data-summary]").forEach(td => {
+        const g = td.dataset.summary;
+        const list = MILESTONES.filter(ms => ms.group === g);
+        const states = list.map(ms => milestoneStatus(milestones[r.id][ms.key]).state);
+        const worst = SEVERITY.find(x => states.includes(x)) || "empty";
+        td.querySelector(".status-dot").className = "status-dot status-dot--" + worst;
+        set(td, ".milestone-summary__text", `${states.filter(x => x === "done").length}/${list.length} done`);
+      });
+    }
+
+    /* ── Collapsing a department ─────────────────────────────── */
+    document.querySelectorAll("[data-group-toggle]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const g = btn.dataset.groupToggle;
+        const isCollapsed = !collapsed.has(g);
+        isCollapsed ? collapsed.add(g) : collapsed.delete(g);
+        btn.setAttribute("aria-expanded", !isCollapsed);
+        const head = document.querySelector(`[data-group-head="${g}"]`);
+        head.classList.toggle("is-collapsed", isCollapsed);
+        head.colSpan = isCollapsed ? 1 : MILESTONES.filter(ms => ms.group === g).length;
+        document.querySelectorAll(`[data-group="${g}"]`).forEach(el => {
+          const isSummary = el.matches(".milestone-summary, .milestone-summary-head");
+          el.hidden = isSummary ? !isCollapsed : isCollapsed;
+        });
+      });
+    });
+
+
+    /* ── Gantt ───────────────────────────────────────────────────
+       Window: Monday of last week to Sunday of next week. Grid column
+       1 is the label; day d (0–20) is column d + 2.
+       ------------------------------------------------------------ */
+    const DAYS = 21;
+    const WEEK_START = (() => {
+      const d = new Date(TODAY);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);   // Monday, last week
+      return d;
+    })();
+    const dayIndex = iso => { const d = RolloutStatus.parseISO(iso); return d ? Math.round((d - WEEK_START) / 864e5) : null; };
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const addDays = n => { const d = new Date(WEEK_START); d.setDate(d.getDate() + n); return d; };
+    const GROUP_KEYS = [...new Set(MILESTONES.map(ms => ms.group))];
+    const gantt = document.getElementById("gantt");
+
+    /* The two header rows never change, so they are built once. */
+    (function ganttHeader(){
+      ["Last week", "This week", "Next week"].forEach((name, w) => {
+        const el = tpl("ganttWeekTemplate").firstElementChild.cloneNode(true);
+        const a = addDays(w * 7), b = addDays(w * 7 + 6);
+        set(el, ".gantt__week-name", name);
+        set(el, ".gantt__week-range",
+          `${MONTHS[a.getMonth()]} ${a.getDate()} – ${a.getMonth() === b.getMonth() ? "" : MONTHS[b.getMonth()] + " "}${b.getDate()}`);
+        el.style.gridColumn = `${w * 7 + 2} / span 7`;   // row 1 is set in CSS
+        gantt.appendChild(el);
+      });
+      const corner = document.createElement("div");
+      corner.className = "gantt__corner gantt__corner--days";
+      gantt.appendChild(corner);
+      for (let d = 0; d < DAYS; d++){
+        const el = tpl("ganttDayTemplate").firstElementChild.cloneNode(true);
+        const date = addDays(d);
+        set(el, ".gantt__day-name", DAY_NAMES[d % 7]);
+        set(el, ".gantt__day-num", date.getDate());
+        if (d % 7 === 0) el.classList.add("is-week-start");
+        if (d % 7 >= 5) el.classList.add("is-weekend");
+        if (RolloutStatus.daysBetween(date, TODAY) === 0) el.classList.add("is-today");
+        el.style.gridColumn = String(d + 2);   // row 2 is set in CSS
+        gantt.appendChild(el);
+      }
+    })();
+
+    /* Rollout rows are rebuilt whenever a date changes. Every body
+       item gets an explicit grid row, so the weekend / today column
+       shades can span them all without disturbing placement. */
+    function renderGantt(){
+      gantt.querySelectorAll("[data-gantt-body]").forEach(el => el.remove());
+      let row = 3;   // rows 1–2 are the header
+      const place = el => { el.dataset.ganttBody = ""; el.style.gridRow = String(row); };
+      ROLLOUTS.forEach(data => {
+        const r = data.rollout || {};
+        const head = tpl("ganttRolloutTemplate").cloneNode(true);
+        const link = head.querySelector(".gantt__rollout-name");
+        link.textContent = r.name || "Rollout";
+        link.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
+        set(head, ".gantt__rollout-customer", r.customer || "—");
+        const [label, track] = head.children;
+        place(label); place(track);
+
+        const items = MILESTONES.map(ms => {
+          const m = milestones[r.id][ms.key] || {};
+          const st = RolloutStatus.milestoneStatus(m);
+          return { ms, m, st, day: dayIndex(st.date) };
+        }).filter(x => x.day !== null);
+
+        /* One bar per department, spanning its dated milestones and
+           clipped to the window. */
+        GROUP_KEYS.forEach(g => {
+          const mine = items.filter(x => x.ms.group === g);
+          if (!mine.length) return;
+          const first = Math.min(...mine.map(x => x.day)), last = Math.max(...mine.map(x => x.day));
+          const a = Math.max(first, 0), b = Math.min(last, DAYS - 1);
+          if (a > b) return;
+          const bar = tpl("ganttBarTemplate").firstElementChild.cloneNode(true);
+          bar.style.gridColumn = `${a + 1} / ${b + 2}`;
+          bar.title = GROUP_NAMES[g];
+          bar.classList.toggle("is-cut-start", first < 0);
+          bar.classList.toggle("is-cut-end", last > DAYS - 1);
+          track.appendChild(bar);
+        });
+
+        const before = items.filter(x => x.day < 0).length;
+        const after = items.filter(x => x.day > DAYS - 1).length;
+        const moreB = track.querySelector(".gantt__more--before");
+        const moreA = track.querySelector(".gantt__more--after");
+        moreB.hidden = !before; moreB.textContent = `◂ ${before} earlier`;
+        moreA.hidden = !after;  moreA.textContent = `${after} later ▸`;
+
+        items.filter(x => x.day >= 0 && x.day < DAYS).forEach(x => {
+          const btn = tpl("ganttMarkerTemplate").firstElementChild.cloneNode(true);
+          btn.dataset.marker = `${r.id}:${x.ms.key}`;
+          btn.style.gridColumn = String(x.day + 1);
+          btn.classList.add("is-" + x.st.state);
+          btn.querySelector(".status-dot").className = "status-dot status-dot--" + x.st.state;
+          set(btn, ".gantt__marker-label", x.ms.label);
+          btn.title = `${x.ms.label} · ${GROUP_NAMES[x.ms.group]} · ${RolloutStatus.shortDate(x.st.date)} · ${x.st.sub}${x.m.note ? "\n" + x.m.note : ""}`;
+          btn.setAttribute("aria-label", `${x.ms.label}, ${r.name}: ${RolloutStatus.shortDate(x.st.date)}, ${x.st.sub}. Edit.`);
+          btn.addEventListener("click", () => openFlyout(r, x.ms, btn));
+          track.appendChild(btn);
+        });
+        gantt.appendChild(head);
+        row++;
+      });
+
+      /* Weekend and today shading, one full-height strip per column. */
+      for (let d = 0; d < DAYS; d++){
+        const today = RolloutStatus.daysBetween(addDays(d), TODAY) === 0;
+        if (d % 7 < 5 && !today) continue;
+        const shade = document.createElement("div");
+        shade.className = "gantt__shade " + (today ? "gantt__shade--today" : "gantt__shade--weekend");
+        shade.dataset.ganttBody = "";
+        shade.style.gridColumn = String(d + 2);
+        shade.style.gridRow = `3 / ${row}`;
+        gantt.prepend(shade);
+      }
+    }
+    renderGantt();
+
+    /* ── View switch ─────────────────────────────────────────── */
+    document.querySelectorAll("[data-view]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const view = btn.dataset.view;
+        document.querySelectorAll("[data-view]").forEach(b => {
+          const on = b === btn;
+          b.classList.toggle("is-active", on);
+          b.setAttribute("aria-pressed", on);
+        });
+        document.querySelector(".rollout-scroller").hidden = view !== "table";
+        document.getElementById("ganttView").hidden = view !== "gantt";
+        document.querySelectorAll("[data-hint]").forEach(h => { h.hidden = h.dataset.hint !== view; });
+      });
+    });
+
+    /* ── Milestone flyout ────────────────────────────────────────
+       One flyout, filled for the cell that opened it. Save writes
+       target / actual / note and repaints that cell and its row's
+       summaries. Cancel, the close button, the overlay and Esc
+       discard.
+       ------------------------------------------------------------ */
+    const flyout = document.getElementById("milestoneFlyout");
+    const fTarget = document.getElementById("milestoneTarget");
+    const fActual = document.getElementById("milestoneActual");
+    const fNote = document.getElementById("milestoneNote");
+    let editing = null;   // {r, ms, td}
+
+    /* `origin` is what opened it: a table cell (td) or a Gantt dot. It
+       carries is-selected while the flyout is open and gets focus back
+       after. */
+    function openFlyout(r, ms, origin){
+      if (editing) editing.origin.classList.remove("is-selected");
+      const m = milestones[r.id][ms.key] || {};
+      editing = { r, ms, origin };
+      origin.classList.add("is-selected");
+      set(flyout, "#milestoneFlyoutTitle", ms.label);
+      set(flyout, "#milestoneFlyoutContext", `${r.name} · ${GROUP_NAMES[ms.group]}`);
+      fTarget.value = m.target || "";
+      fActual.value = m.actual || "";
+      fNote.value = m.note || "";
+      flyout.classList.add("open");
+      (m.target ? fActual : fTarget).focus();
+    }
+
+    function closeFlyout(){
+      if (!editing) return;
+      const { origin } = editing;
+      flyout.classList.remove("open");
+      origin.classList.remove("is-selected");
+      (origin.matches("td") ? origin.querySelector(".ms-cell") : origin).focus();
+      editing = null;
+    }
+
+    /* Saves, then repaints both views: the table cell and its row's
+       summaries, and the Gantt (whose dot may have moved day). */
+    function saveFlyout(){
+      if (!editing) return;
+      const { r, ms, origin } = editing;
+      const next = { target: fTarget.value, actual: fActual.value, note: fNote.value.trim() };
+      if (next.target || next.actual || next.note) milestones[r.id][ms.key] = next;
+      else delete milestones[r.id][ms.key];
+      const td = document.querySelector(`tr.rollout-row[data-rollout="${r.id}"] td[data-milestone="${ms.key}"]`);
+      paintCell(td, r, ms);
+      paintSummaries(td.closest("tr"), r);
+      const fromGantt = !origin.matches("td");
+      closeFlyout();
+      renderGantt();
+      if (fromGantt){
+        const again = document.querySelector(`.gantt__marker[data-marker="${r.id}:${ms.key}"]`);
+        again && again.focus();
+      }
+    }
+
+    document.getElementById("milestoneToday").addEventListener("click", () => {
+      fActual.value = toISO(TODAY); fActual.focus();
+    });
+    document.getElementById("milestoneSave").addEventListener("click", saveFlyout);
+    flyout.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeFlyout));
+    /* A click on the dimmed overlay, not the panel, cancels. */
+    flyout.addEventListener("click", e => { if (e.target === flyout) closeFlyout(); });
+    flyout.addEventListener("keydown", e => {
+      if (e.key === "Escape"){ e.preventDefault(); closeFlyout(); }
+      /* Enter saves; Shift+Enter is a new line in the note. */
+      else if (e.key === "Enter" && !e.shiftKey && e.target.matches("input, textarea")){
+        e.preventDefault(); saveFlyout();
+      }
+    });
+    </script>
+
+    <!-- ══════════════════════════════════════════════════════════
+         IMPLEMENTATION NOTES
+         ──────────────────────────────────────────────────────────
+         Components → markup and styles
+           AppShell        → shared sidebar + .main-content (rollout-dashboard.css)
+           Breadcrumbs     → .breadcrumb-bar, components/breadcrumbs/breadcrumbs.css
+           DashTopbar      → <header class="dash-topbar">, .dash-topbar / .dash-title
+           ViewToggle      → .view-toggle in the topbar (Table / Gantt), aria-pressed
+           Gantt           → #ganttView > .gantt (one CSS grid: label column +
+                             21 day columns); ganttWeekTemplate, ganttDayTemplate,
+                             ganttRolloutTemplate, ganttBarTemplate,
+                             ganttMarkerTemplate; .gantt__* styles
+           StatusLegend    → .status-legend markup + styles; the dot is
+                             components/status-dot/status-dot.css
+           RolloutList     → <table class="rollout-list"> in .rollout-scroller
+           MilestoneHeads  → two-row <thead>: th.milestone-group (with its
+                             collapse toggle) over th.milestone-head[data-milestone]
+                             and a hidden th.milestone-summary-head per group
+           RolloutRow      → rolloutRowTemplate (tr.rollout-row), .rollout-row__*
+           MilestoneCell   → milestoneCellTemplate (td.milestone > button.ms-cell),
+                             .milestone / .ms-cell__* styles; status on the td
+           GroupSummary    → groupSummaryTemplate (td.milestone-summary)
+           MilestoneFlyout → #milestoneFlyout — the shared flyout
+                             (components/flyout/flyout.css, copied unchanged
+                             from Inventory Quantity Upgrade) with
+                             .flyout-panel--narrow; fields are the inventory
+                             .field / .field-label / .field-pair / .input
+
+         Milestones
+           Files Received, Tickets, Initial Proof Out, Files Approved
+           (Pre-Production — CSR / PrePress); Printed, Cut, Finishing
+           (Print Production); Ship Date (Shipping); Billing Prep, Billing
+           Done (Accounting). Each is {target, actual, note}.
+
+         Status (milestoneStatus())
+           done      actual set — shows the actual date and its offset from
+                     target ("Done · +1d")
+           late      target passed with no actual — "5d late", red fill
+           due       target within 3 days — "Due in 2d", copper fill
+           upcoming  later target — hollow dot, "Target"
+           empty     nothing set — "Set dates"
+           A collapsed group shows "N/M done" and its worst status.
+           This is the computed replacement for the spreadsheet's Status
+           Check column.
+
+         Gantt
+           Last week, this week and next week (Mon–Sun, 21 days) around
+           TODAY. One row per rollout (milestones never overlap, so they
+           share a track): a bar per department from its first to its last
+           milestone date (squared off where the window cuts it), a dot per
+           milestone on its date — actual if done, else
+           target — in its status colour, and "N earlier" / "N later" at the
+           edges for milestones outside the window. Dots open the same
+           flyout as the table cells; saving repaints both views. Weekends
+           are shaded and today's column is marked.
+
+         Simulated in JS, becomes Angular state/events
+           - Table / Gantt is a view signal; the Gantt window (WEEK_START,
+             DAYS) would become inputs if it ever needs to page.
+           - Gantt positions are grid-column values set per element (the one
+             place a dynamic inline value is used) → [style.grid-column]
+             bindings.
+           - Rows and cells are cloned from the templates → @for over
+             rollouts, and over the milestone list inside each row.
+           - Status is computed on paint from TODAY → a pure function / pipe.
+           - Group collapse flips `hidden` on that group's cells and the
+             group header's colspan → a collapsed-groups set in component
+             state (persist per user if wanted).
+           - The flyout: openFlyout() fills it, saveFlyout() writes the
+             in-memory `milestones` object and repaints. Enter saves (Shift+
+             Enter for a new line in the note), Esc / Cancel / overlay
+             discard. Swap for the team's flyout component; nothing persists.
+           - summarize() and rollout-status.js (milestoneStatus() and the date
+             helpers, shared with the manager's Overview) move to the
+             rollout service.
+
+         Only there to make the prototype demonstrable
+           - window.ROLLOUTS from the three rollout-data*.js files; the
+             milestone dates in them are SAMPLE dates set around 9/22/2026.
+           - TODAY is the real date, so the sample states drift; pin it in
+             rollout-status.js to hold them.
+
+         Tokens to flag
+           - Late / due sub-text uses --text-primary, not a red: the only red
+             text token (--color-red-900) is reserved for rejected-input help
+             text. A status text token would fix this upstream.
+           - --shadow-panel and --duration-panel are declared locally for the
+             flyout, same values as inventory.css.
+         ══════════════════════════════════════════════════════════ -->
+  </body>
+</html>

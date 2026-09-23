@@ -19,8 +19,44 @@
                    include the Brunch spin-offs. Swap in real
                    numbers when there are some.
    ============================================================ */
-window.ROLLOUT_DATA = {
+/* Registered for the dashboard and the ?rollout= switch; still sets
+   ROLLOUT_DATA directly because rollout-manager-table.html reads it. */
+(window.ROLLOUTS = window.ROLLOUTS || {})["fogo-0929"] = window.ROLLOUT_DATA = {
   "rollout": {
+    "id": "fogo-0929",
+    "_milestonesNote": "SAMPLE dates for the dashboard demo, relative to 9/22/2026.",
+    "milestones": {
+      "filesReceived": {
+        "target": "2026-09-25"
+      },
+      "tickets": {
+        "target": "2026-09-29"
+      },
+      "initialProofOut": {
+        "target": "2026-10-02"
+      },
+      "filesApproved": {
+        "target": "2026-10-09"
+      },
+      "printed": {
+        "target": "2026-10-19"
+      },
+      "cut": {
+        "target": "2026-10-21"
+      },
+      "finishing": {
+        "target": "2026-10-23"
+      },
+      "shipDate": {
+        "target": "2026-10-27"
+      },
+      "billingPrep": {
+        "target": "2026-10-30"
+      },
+      "billingCompleted": {
+        "target": "2026-11-06"
+      }
+    },
     "customer": "(21491) Fogo De Chao Corporate",
     "name": "0929 Menu Insert Rollout"
   },
