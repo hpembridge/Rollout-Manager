@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
     <link rel="stylesheet" href="components/status-dot/status-dot.css" />
+    <link rel="stylesheet" href="components/avatar/avatar.css" />
     <link rel="stylesheet" href="rollout-manager.css" />
     <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
     <!-- Seed rollouts. Each registers itself in window.ROLLOUTS by id;
@@ -25,7 +26,7 @@
         window.ROLLOUT_DATA = all[id] || Object.values(all)[0];
       })();
     </script>
-    <!-- Customer / CSR lookups for the Overview details. -->
+    <!-- Customer / CSR / people lookups for the Overview. -->
     <script src="rollout-customers.js"></script>
     <!-- Milestone status rules, shared with the dashboard. -->
     <script src="rollout-status.js"></script>
@@ -103,10 +104,24 @@
            timeline, and what is being made for whom. Static markup;
            renderOverview() fills the values from `state`, so what is
            here follows edits on the other tabs. The milestone list is
-           the same ten, in the same groups, as the dashboard.
+           the dashboard's eleven milestones in the same groups, plus
+           two key dates (On Property, Goes Live) under Shipping.
            ───────────────────────────────────────────────────── -->
       <div class="overview" id="overview" hidden>
         <div class="page-width overview__inner">
+
+          <!-- OverviewHeader — the rollout name (left) and customer (right),
+               both editable in place (.detail-field). The customer is
+               typed and completed from the customer list; a name that is
+               not a customer is refused. -->
+          <header class="ov-header">
+            <input class="detail-field ov-header__name" id="ovName" type="text" autocomplete="off"
+                   aria-label="Rollout name" data-ov-edit="name" />
+            <input class="detail-field ov-header__customer" id="ovCustomer" type="text" autocomplete="off"
+                   aria-label="Customer" list="ovCustomerOptions" data-ov-edit="customer" />
+            <datalist id="ovCustomerOptions"><!-- one <option> per customer --></datalist>
+          </header>
+          <!-- /OverviewHeader -->
 
           <!-- OverviewTimeline — a sheet: one column per milestone under its
                department, rows for Target and Actual (editable date
@@ -120,19 +135,22 @@
             </header>
             <div class="ov-timeline__scroller">
             <table class="ov-timeline">
-              <!-- Fixed layout: the row-head column is set, the ten
+              <!-- On Property and Goes Live are key dates, not action
+                   items: a target only (the Actual cell is blank), no
+                   status, not counted as done. -->
+              <!-- Fixed layout: the row-head column is set, the thirteen
                    milestone columns share the rest equally. -->
               <colgroup>
                 <col class="ov-timeline__col-head" />
-                <col span="10" class="ov-timeline__col" />
+                <col span="13" class="ov-timeline__col" />
               </colgroup>
               <thead>
                 <tr>
                   <th scope="col" rowspan="2" class="ov-timeline__corner"><span class="visually-hidden">Date</span></th>
                   <th scope="colgroup" colspan="4" class="ov-timeline__group group-start">Pre-Production <span class="ov-timeline__owner">CSR / PrePress</span></th>
                   <th scope="colgroup" colspan="3" class="ov-timeline__group group-start">Print Production</th>
-                  <th scope="colgroup" colspan="1" class="ov-timeline__group group-start">Shipping</th>
-                  <th scope="colgroup" colspan="2" class="ov-timeline__group group-start">Accounting</th>
+                  <th scope="colgroup" colspan="3" class="ov-timeline__group group-start">Shipping</th>
+                  <th scope="colgroup" colspan="3" class="ov-timeline__group group-start">Accounting</th>
                 </tr>
                 <tr>
                   <th scope="col" class="ov-timeline__milestone group-start" data-milestone="filesReceived">Files Received</th>
@@ -143,7 +161,10 @@
                   <th scope="col" class="ov-timeline__milestone" data-milestone="cut">Cut</th>
                   <th scope="col" class="ov-timeline__milestone" data-milestone="finishing">Finishing</th>
                   <th scope="col" class="ov-timeline__milestone group-start" data-milestone="shipDate">Ship Date</th>
+                  <th scope="col" class="ov-timeline__milestone ov-timeline__milestone--key" data-milestone="onProperty">On Property</th>
+                  <th scope="col" class="ov-timeline__milestone ov-timeline__milestone--key" data-milestone="goesLive">Goes Live</th>
                   <th scope="col" class="ov-timeline__milestone group-start" data-milestone="billingPrep">Billing Prep</th>
+                  <th scope="col" class="ov-timeline__milestone" data-milestone="inBilling">In Billing</th>
                   <th scope="col" class="ov-timeline__milestone" data-milestone="billingCompleted">Billing Done</th>
                 </tr>
               </thead>
@@ -158,7 +179,10 @@
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="cut" data-field="target" aria-label="Cut target" /></td>
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="finishing" data-field="target" aria-label="Finishing target" /></td>
                   <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="shipDate" data-field="target" aria-label="Ship Date target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="onProperty" data-field="target" aria-label="On Property target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="goesLive" data-field="target" aria-label="Goes Live target" /></td>
                   <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="billingPrep" data-field="target" aria-label="Billing Prep target" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="inBilling" data-field="target" aria-label="In Billing target" /></td>
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="billingCompleted" data-field="target" aria-label="Billing Done target" /></td>
                 </tr>
                 <tr class="ov-timeline__row ov-timeline__row--actual">
@@ -171,7 +195,10 @@
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="cut" data-field="actual" aria-label="Cut actual" /></td>
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="finishing" data-field="actual" aria-label="Finishing actual" /></td>
                   <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="shipDate" data-field="actual" aria-label="Ship Date actual" /></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--na" aria-label="On Property: no actual"></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--na" aria-label="Goes Live: no actual"></td>
                   <td class="ov-timeline__cell group-start"><input class="cell-field" type="date" data-milestone="billingPrep" data-field="actual" aria-label="Billing Prep actual" /></td>
+                  <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="inBilling" data-field="actual" aria-label="In Billing actual" /></td>
                   <td class="ov-timeline__cell"><input class="cell-field" type="date" data-milestone="billingCompleted" data-field="actual" aria-label="Billing Done actual" /></td>
                 </tr>
                 <tr class="ov-timeline__row ov-timeline__row--status">
@@ -184,7 +211,10 @@
                   <td class="ov-timeline__status" data-milestone="cut"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
                   <td class="ov-timeline__status" data-milestone="finishing"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
                   <td class="ov-timeline__status group-start" data-milestone="shipDate"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__keydate">Key date</td>
+                  <td class="ov-timeline__keydate">Key date</td>
                   <td class="ov-timeline__status group-start" data-milestone="billingPrep"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
+                  <td class="ov-timeline__status" data-milestone="inBilling"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
                   <td class="ov-timeline__status" data-milestone="billingCompleted"><span class="status-dot"></span> <span class="ov-timeline__status-text"></span></td>
                 </tr>
                 <tr class="ov-timeline__row ov-timeline__row--note">
@@ -197,7 +227,10 @@
                   <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="cut" data-field="note" aria-label="Cut note"></textarea></td>
                   <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="finishing" data-field="note" aria-label="Finishing note"></textarea></td>
                   <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="shipDate" data-field="note" aria-label="Ship Date note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="onProperty" data-field="note" aria-label="On Property note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="goesLive" data-field="note" aria-label="Goes Live note"></textarea></td>
                   <td class="ov-timeline__cell ov-timeline__cell--note group-start"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="billingPrep" data-field="note" aria-label="Billing Prep note"></textarea></td>
+                  <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="inBilling" data-field="note" aria-label="In Billing note"></textarea></td>
                   <td class="ov-timeline__cell ov-timeline__cell--note"><textarea class="cell-field cell-field--note" rows="1" placeholder="Add note" data-milestone="billingCompleted" data-field="note" aria-label="Billing Done note"></textarea></td>
                 </tr>
               </tbody>
@@ -209,33 +242,19 @@
           <!-- Details stacked on the left, products beside it. -->
           <div class="overview__split">
 
-          <!-- OverviewDetails — Rollout, Customer and CSR are editable in
-               place (.detail-field, the inventory cell-field treatment);
-               Sales is read from the customer's account. -->
+          <!-- OverviewDetails — who is on it (CSR, editable; Sales, read
+               from the customer's account), each with their avatar
+               (components/avatar), then the rollup: locations and total
+               quantity across every product. -->
           <section class="overview-card overview-details" aria-labelledby="ovDetailsTitle">
             <header class="overview-card__head">
               <h2 class="overview-card__title" id="ovDetailsTitle">Details</h2>
             </header>
             <dl class="detail-list">
               <div class="detail-list__item">
-                <dt class="detail-list__label"><label for="ovName">Rollout</label></dt>
-                <dd class="detail-list__value">
-                  <input class="detail-field" id="ovName" type="text" autocomplete="off" data-ov-edit="name" />
-                </dd>
-              </div>
-              <div class="detail-list__item">
-                <dt class="detail-list__label"><label for="ovCustomer">Customer</label></dt>
-                <dd class="detail-list__value">
-                  <!-- Typed and completed from the customer list; a name
-                       that is not a customer is refused. -->
-                  <input class="detail-field" id="ovCustomer" type="text" autocomplete="off"
-                         list="ovCustomerOptions" data-ov-edit="customer" />
-                  <datalist id="ovCustomerOptions"><!-- one <option> per customer --></datalist>
-                </dd>
-              </div>
-              <div class="detail-list__item">
                 <dt class="detail-list__label"><label for="ovCsr">CSR</label></dt>
-                <dd class="detail-list__value">
+                <dd class="detail-list__value detail-person">
+                  <span class="avatar" data-ov-avatar="csr"></span>
                   <select class="detail-field detail-field--select" id="ovCsr" data-ov-edit="csr">
                     <option value="">—</option>
                     <!-- one <option> per CSR -->
@@ -244,17 +263,22 @@
               </div>
               <div class="detail-list__item">
                 <dt class="detail-list__label">Sales</dt>
-                <dd class="detail-list__value detail-list__value--derived">
+                <dd class="detail-list__value detail-list__value--derived detail-person">
+                  <span class="avatar" data-ov-avatar="sales"></span>
                   <span data-ov="sales"></span>
                 </dd>
               </div>
-              <div class="detail-list__item">
-                <dt class="detail-list__label">Locations</dt>
-                <dd class="detail-list__value num" data-ov="locations"></dd>
+            </dl>
+
+            <!-- Rollup totals -->
+            <dl class="rollup">
+              <div class="rollup__tile">
+                <dt class="rollup__label">Locations</dt>
+                <dd class="rollup__value" data-ov="locations"></dd>
               </div>
-              <div class="detail-list__item">
-                <dt class="detail-list__label">Total quantity</dt>
-                <dd class="detail-list__value num" data-ov="total"></dd>
+              <div class="rollup__tile">
+                <dt class="rollup__label">Total quantity</dt>
+                <dd class="rollup__value" data-ov="total"></dd>
               </div>
             </dl>
           </section>
@@ -668,15 +692,18 @@ function masterTable(){
     rowHead:"Master Ticket",
     rows: state.versions.map(v=>({key:v.id, kind:"version", label:v.job}))
            .concat([{key:"__add", kind:"addrow", label:"+ Add Master Ticket"}]),
-    /* Quantity first, as a read-only roll-up of the distribution list.
-       It is pinned: it is what the rest of the row is read against, so
-       nothing moves in front of it. */
-    cols: [{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true},
+    /* Job Description first, beside the ticket number: it says what
+       the ticket is. Pinned, and still an editable job field. Then
+       Quantity, a read-only roll-up of the distribution list, pinned:
+       it is what the rest of the row is read against. */
+    cols: JOBFIELDS.filter(f=>f.id==="desc").map(f=>({key:f.id, kind:"jobfield", label:f.name,
+                     w:f.w||230, pinned:true}))
+           .concat([{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true},
            /* Tiers are the ticket's own, so they sit with the ticket
               rather than on a table of their own. Pinned beside the
               quantity: they are how that quantity splits. */
-           {key:"__tiers", kind:"tiers", label:"Versions", w:260, pinned:true}]
-           .concat(JOBFIELDS.map(f=>({key:f.id, kind:"jobfield", label:f.name, num:f.num,
+           {key:"__tiers", kind:"tiers", label:"Versions", w:260, pinned:true}])
+           .concat(JOBFIELDS.filter(f=>f.id!=="desc").map(f=>({key:f.id, kind:"jobfield", label:f.name, num:f.num,
                      w:f.w||180, movable:true, options:f.options, bool:f.bool})))
            .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
     cellAt(rk, ck){
@@ -961,6 +988,20 @@ function renderOverview(){
   ovSet("sales", sales || "Not on file");
   document.querySelector('[data-ov="sales"]').classList.toggle("is-missing", !sales);
   ovSet("locations", locs.toLocaleString());
+  /* CSR / Sales avatars: initials and data color from the people
+     directory (rollout-customers.js); nobody → dashed circle. */
+  const people = window.ROLLOUT_PEOPLE || {};
+  document.querySelectorAll("[data-ov-avatar]").forEach(av=>{
+    const role = av.dataset.ovAvatar;
+    const first = role==="csr" ? r.csr : sales;
+    const p = people[first] || {name: first || "", color: ""};
+    av.textContent = p.name ? p.name.split(/\s+/).map(w=>w[0]).join("").toUpperCase() : "";
+    av.classList.toggle("is-unassigned", !p.name);
+    if(p.color){ av.dataset.color = p.color; av.dataset.shade = p.shade || "02"; }
+    else { delete av.dataset.color; delete av.dataset.shade; }
+    av.title = `${role==="csr"?"CSR":"Sales"}: ${p.name || "none"}`;
+    av.setAttribute("aria-hidden", "true");
+  });
   ovSet("total", total.toLocaleString());
 
   /* Timeline sheet. */
@@ -2133,8 +2174,11 @@ render();
                                to rollout-dashboard.html
            RolloutOutputs    → #shipTracker / #createTickets in the topbar
            Overview          → <div class="overview"> markup, filled by
-                               renderOverview(); .overview-card, .detail-list +
-                               .detail-field, .ov-timeline + .cell-field,
+                               renderOverview(); .ov-header (name left,
+                               customer right), .overview-card, .detail-list +
+                               .detail-field, .detail-person + .avatar
+                               (components/avatar), .rollup tiles,
+                               .ov-timeline + .cell-field,
                                .product-cards / .product-card / .version-line
                                styles. Templates: ovProductCardTemplate,
                                ovVersionLineTemplate. Layout: the timeline and
@@ -2159,13 +2203,16 @@ render();
            Toast             → built by toast(), .toast styles
 
          What each tab shows
-           Overview          → the default tab. Details: Rollout, Customer and CSR
+           Overview          → the default tab. The header holds the rollout
+                               name and customer; Details holds CSR and Sales
+                               with avatars (ROLLOUT_PEOPLE) and the rollup.
+                               Rollout, Customer and CSR
                                are edited in place (Customer is typed against
                                ROLLOUT_CUSTOMERS and refused if not on it; CSR
                                picks from ROLLOUT_CSRS); Sales is read from the
                                customer (salesFor()), never entered; locations
                                and total quantity are roll-ups. The project
-                               timeline is a sheet — the dashboard's ten
+                               timeline is a sheet — the dashboard's eleven milestones plus the On Property / Goes Live key dates as
                                milestones as columns under their departments,
                                Target and Actual as editable date rows, and a
                                read-only Status row from rollout-status.js,

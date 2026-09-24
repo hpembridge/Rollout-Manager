@@ -25,41 +25,22 @@
 (window.ROLLOUTS = window.ROLLOUTS || {})["puttshack"] = {
   "rollout": {
     "id": "puttshack",
-    "_milestonesNote": "SAMPLE dates for the dashboard demo, relative to 9/22/2026.",
+    "pressRun": "Main 20 vers 3,810; Bev 20 ver 2,340; Dessert 20 ver 1,900",
+    "_milestonesNote": "From the Rollouts Planning & Production Board sheet, 9/23/2026. Ticked milestones with no date on the sheet have made-up actual dates.",
     "milestones": {
       "filesReceived": {
-        "target": "2026-09-02",
-        "actual": "2026-09-03"
-      },
-      "tickets": {
-        "target": "2026-09-05",
-        "actual": "2026-09-05"
+        "actual": "2026-08-20",
+        "note": "8-20 In Creative"
       },
       "initialProofOut": {
-        "target": "2026-09-10",
-        "actual": "2026-09-12"
-      },
-      "filesApproved": {
-        "target": "2026-09-17",
-        "note": "Waiting on final Beverage T2 pricing from client."
-      },
-      "printed": {
-        "target": "2026-09-28"
-      },
-      "cut": {
-        "target": "2026-09-30"
-      },
-      "finishing": {
-        "target": "2026-10-02"
+        "actual": "2026-09-15",
+        "note": "9-15 New Proofs"
       },
       "shipDate": {
-        "target": "2026-10-06"
+        "target": "2026-09-25"
       },
-      "billingPrep": {
-        "target": "2026-10-09"
-      },
-      "billingCompleted": {
-        "target": "2026-10-16"
+      "onProperty": {
+        "target": "2026-09-30"
       }
     },
     "customer": "Puttshack",

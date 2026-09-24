@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
     <link rel="stylesheet" href="components/flyout/flyout.css" />
     <link rel="stylesheet" href="components/status-dot/status-dot.css" />
+    <link rel="stylesheet" href="components/switch/switch.css" />
+    <link rel="stylesheet" href="components/avatar/avatar.css" />
     <link rel="stylesheet" href="rollout-dashboard.css" />
 
     <!-- The same seed files the Rollout Manager loads. Each registers
@@ -19,6 +21,10 @@
     <script src="rollout-data-puttshack.js"></script>
     <script src="rollout-data-famous-daves.js"></script>
     <script src="rollout-data.js"></script>
+    <!-- The rest of the planning sheet: summary rollouts (dashboard only). -->
+    <script src="rollout-data-board.js"></script>
+    <!-- Customers, CSRs and the people directory (avatar names). -->
+    <script src="rollout-customers.js"></script>
     <!-- Milestone status rules, shared with the Rollout Manager. -->
     <script src="rollout-status.js"></script>
     <script>
@@ -45,7 +51,9 @@
       <!-- ══ Topbar ═══════════════════════════════════════════ -->
       <header class="dash-topbar">
         <h1 class="dash-title">Rollouts <span class="dash-title__count" id="rolloutCount"></span></h1>
-        <!-- View switch: the milestone table, or the three-week Gantt.
+        <div class="dash-topbar__actions">
+        <!-- View switch: the milestone table, the three-week Gantt, or
+             the board.
              aria-pressed marks the current one. -->
         <div class="view-toggle" role="group" aria-label="View">
           <button class="view-toggle__btn is-active" type="button" data-view="table" aria-pressed="true">
@@ -54,6 +62,10 @@
           <button class="view-toggle__btn" type="button" data-view="gantt" aria-pressed="false">
             <i class="fa-regular fa-chart-gantt" aria-hidden="true"></i> Gantt
           </button>
+          <button class="view-toggle__btn" type="button" data-view="board" aria-pressed="false">
+            <i class="fa-regular fa-square-kanban" aria-hidden="true"></i> Board
+          </button>
+        </div>
         </div>
       </header>
       <!-- ══ /Topbar ══════════════════════════════════════════ -->
@@ -71,80 +83,87 @@
             <li class="status-legend__item"><span class="status-dot status-dot--late"></span> Late</li>
             <li class="status-legend__item"><span class="status-dot status-dot--upcoming"></span> Upcoming</li>
           </ul>
-          <p class="status-legend__hint" data-hint="table">Cells show the actual date when done, otherwise the target. Click a cell to edit.</p>
-          <p class="status-legend__hint" data-hint="gantt" hidden>Each dot sits on the actual date when done, otherwise the target. Click one to edit.</p>
+          <div class="status-legend__end">
+            <p class="status-legend__hint" data-hint="gantt" hidden>Each dot sits on the actual date when done, otherwise the target. Click one to edit.</p>
+            <p class="status-legend__hint" data-hint="board" hidden>Each rollout sits under its next open milestone. Click a card to update it.</p>
+            <!-- Show completed: a rollout is completed once Billing Done has
+                 an actual date. Off by default, so they drop out of every view. -->
+            <label class="switch">
+              <input type="checkbox" id="showCompleted" />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="switch-label">Show completed</span>
+            </label>
+          </div>
         </div>
         <!-- ══ /Status legend ═════════════════════════════════ -->
 
         <!-- ══ Rollout list ═══════════════════════════════════
              One row per rollout: who it is, how big it is, then one
-             cell per milestone, grouped by department. The per-version
-             breakdown lives on the rollout's Overview tab, not here.
-             Each department group collapses to a single progress
-             column from the chevron in its header.
+             milestone track per department. The per-version breakdown
+             lives on the rollout's Overview tab, and every date is on its
+             timeline; here a dot's date shows on hover.
 
-             The <th data-milestone> cells in header row 2 are the one
-             list of milestones — the row cells are built from them.
+             The li[data-milestone] names in header row 2 are the one
+             list of milestones — the tracks, Gantt and Board lanes are
+             built from them.
              ─────────────────────────────────────────────────── -->
         <div class="rollout-scroller">
           <table class="rollout-list">
             <thead>
               <!-- Row 1: fixed columns span both rows; each department
-                   spans its milestones. -->
+                   heads its track (Shipping also holds Locations). -->
               <tr>
                 <th scope="col" rowspan="2" class="col-client is-sticky">Customer / Rollout</th>
                 <th scope="col" rowspan="2" class="col-products">Products</th>
-                <th scope="col" rowspan="2" class="col-locs num">Locations</th>
                 <th scope="col" rowspan="2" class="col-qty num">Total qty</th>
-
-                <th scope="colgroup" colspan="4" class="milestone-group group-start" data-group-head="pre">
-                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="pre">
-                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
-                    <span class="milestone-group__name">Pre-Production</span>
-                    <span class="milestone-group__owner">CSR / PrePress</span>
-                  </button>
+                <th scope="colgroup" class="milestone-group group-start" data-group-head="pre">
+                  <span class="milestone-group__name">Pre-Production</span>
+                  <span class="milestone-group__owner">CSR / PrePress</span>
                 </th>
-                <th scope="colgroup" colspan="3" class="milestone-group group-start" data-group-head="print">
-                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="print">
-                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
-                    <span class="milestone-group__name">Print Production</span>
-                  </button>
+                <th scope="colgroup" class="milestone-group group-start" data-group-head="print">
+                  <span class="milestone-group__name">Print Production</span>
                 </th>
-                <th scope="colgroup" colspan="1" class="milestone-group group-start" data-group-head="ship">
-                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="ship">
-                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
-                    <span class="milestone-group__name">Shipping</span>
-                  </button>
+                <th scope="colgroup" colspan="2" class="milestone-group group-start" data-group-head="ship">
+                  <span class="milestone-group__name">Shipping</span>
                 </th>
-                <th scope="colgroup" colspan="2" class="milestone-group group-start" data-group-head="acct">
-                  <button class="milestone-group__toggle" type="button" aria-expanded="true" data-group-toggle="acct">
-                    <i class="fa-regular fa-chevron-down" aria-hidden="true"></i>
-                    <span class="milestone-group__name">Accounting</span>
-                  </button>
+                <th scope="colgroup" class="milestone-group group-start" data-group-head="acct">
+                  <span class="milestone-group__name">Accounting</span>
                 </th>
               </tr>
 
-              <!-- Row 2: one per milestone (data-milestone is the key
-                   dates are stored under), plus a hidden Progress
-                   column per group that shows while it is collapsed. -->
+              <!-- Row 2: each department's milestone names, in the same
+                   grid as the track below so each name sits over its dot.
+                   data-milestone is the key dates are stored under. -->
               <tr>
-                <th scope="col" class="milestone-head group-start" data-group="pre" data-milestone="filesReceived">Files Received</th>
-                <th scope="col" class="milestone-head" data-group="pre" data-milestone="tickets">Tickets</th>
-                <th scope="col" class="milestone-head" data-group="pre" data-milestone="initialProofOut">Initial Proof Out</th>
-                <th scope="col" class="milestone-head" data-group="pre" data-milestone="filesApproved">Files Approved</th>
-                <th scope="col" class="milestone-summary-head group-start" data-group="pre" hidden>Progress</th>
-
-                <th scope="col" class="milestone-head group-start" data-group="print" data-milestone="printed">Printed</th>
-                <th scope="col" class="milestone-head" data-group="print" data-milestone="cut">Cut</th>
-                <th scope="col" class="milestone-head" data-group="print" data-milestone="finishing">Finishing</th>
-                <th scope="col" class="milestone-summary-head group-start" data-group="print" hidden>Progress</th>
-
-                <th scope="col" class="milestone-head group-start" data-group="ship" data-milestone="shipDate">Ship Date</th>
-                <th scope="col" class="milestone-summary-head group-start" data-group="ship" hidden>Progress</th>
-
-                <th scope="col" class="milestone-head group-start" data-group="acct" data-milestone="billingPrep">Billing Prep</th>
-                <th scope="col" class="milestone-head" data-group="acct" data-milestone="billingCompleted">Billing Done</th>
-                <th scope="col" class="milestone-summary-head group-start" data-group="acct" hidden>Progress</th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="pre">
+                  <ol class="ms-track ms-track-head">
+                    <li class="ms-track-head__name" data-milestone="filesReceived">Files Received</li>
+                    <li class="ms-track-head__name" data-milestone="tickets">Tickets</li>
+                    <li class="ms-track-head__name" data-milestone="initialProofOut">Initial Proof Out</li>
+                    <li class="ms-track-head__name" data-milestone="filesApproved">Files Approved</li>
+                  </ol>
+                </th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="print">
+                  <ol class="ms-track ms-track-head">
+                    <li class="ms-track-head__name" data-milestone="printed">Printed</li>
+                    <li class="ms-track-head__name" data-milestone="cut">Cut</li>
+                    <li class="ms-track-head__name" data-milestone="finishing">Finishing</li>
+                  </ol>
+                </th>
+                <!-- Locations is not a milestone; it sits in Shipping. -->
+                <th scope="col" class="col-locs num group-start">Locations</th>
+                <th scope="col" class="milestone-summary-head" data-group="ship">
+                  <ol class="ms-track ms-track-head">
+                    <li class="ms-track-head__name" data-milestone="shipDate">Ship Date</li>
+                  </ol>
+                </th>
+                <th scope="col" class="milestone-summary-head group-start" data-group="acct">
+                  <ol class="ms-track ms-track-head">
+                    <li class="ms-track-head__name" data-milestone="billingPrep">Billing Prep</li>
+                    <li class="ms-track-head__name" data-milestone="inBilling">In Billing</li>
+                    <li class="ms-track-head__name" data-milestone="billingCompleted">Billing Done</li>
+                  </ol>
+                </th>
               </tr>
             </thead>
             <tbody id="rolloutRows"></tbody>
@@ -176,60 +195,132 @@
         </div>
         <!-- ══ /Gantt ═════════════════════════════════════════ -->
 
+        <!-- ══ Board ══════════════════════════════════════════
+             Kanban, after the PL-JOBS-DASHBOARDS boards. One lane per
+             milestone, in order; Billing Done is the last. A rollout
+             sits in the lane of its next open milestone — the first one
+             not done — and moves right as actuals are entered; one with
+             everything done sits in Billing Done. Lanes are colour-coded
+             by department along the top edge (data-group), and the board
+             drags sideways like the jobs boards.
+             Empty lanes collapse to a rail (click to open; "Expand N
+             empty" opens them all). The card's stripe is that milestone's
+             status. Clicking a card opens the flyout for that milestone.
+
+             Lanes come from the same milestone list as the table;
+             renderBoard() clones boardLaneTemplate / rolloutCardTemplate.
+             ─────────────────────────────────────────────────── -->
+        <div class="board" id="boardView" hidden>
+          <div class="board__toolbar">
+            <button class="text-btn" type="button" id="boardToggleEmpty"></button>
+          </div>
+          <div class="kanban" id="kanban">
+            <!-- boardLaneTemplate × milestones -->
+          </div>
+        </div>
+        <!-- ══ /Board ═════════════════════════════════════════ -->
+
       </main>
     </div>
 
     <!-- ══ Templates ══════════════════════════════════════════
          rolloutRowTemplate   → the <tr> for one rollout
-         milestoneCellTemplate→ one milestone on one rollout
-         groupSummaryTemplate → a collapsed department's progress cell
+         msStepTemplate       → one milestone on a department's track
          ──────────────────────────────────────────────────────── -->
     <template id="rolloutRowTemplate">
       <tr class="rollout-row">
         <td class="col-client rollout-row__client is-sticky">
-          <!-- Customer leads; the rollout (a link to it) and who is on it
-               follow on one quieter line. -->
-          <span class="rollout-row__customer"></span>
-          <span class="rollout-row__sub">
-            <a class="rollout-row__name" href="#"></a>
-            <span class="rollout-row__meta"></span>
-          </span>
+          <div class="rollout-row__client-inner">
+            <!-- Customer leads; the rollout name (a link to it) follows. -->
+            <div class="rollout-row__who">
+              <span class="rollout-row__customer"></span>
+              <a class="rollout-row__name" href="#"></a>
+            </div>
+            <!-- CSR, then Sales (components/avatar). -->
+            <span class="avatar-group rollout-row__people">
+              <span class="avatar" data-role="csr"></span>
+              <span class="avatar" data-role="sales"></span>
+            </span>
+          </div>
         </td>
         <td class="col-products rollout-row__products">
           <span class="rollout-row__product-count"></span>
           <span class="rollout-row__version-count"></span>
         </td>
-        <td class="col-locs num rollout-row__locations"></td>
         <td class="col-qty num rollout-row__total"></td>
-        <!-- milestone and group-summary cells go here, in header order -->
+        <!-- One track per department (MilestoneTrack): one msStepTemplate
+             per milestone goes in each ol, from the header's list. Status
+             is data-state on each step; done-to-done links are filled. -->
+        <td class="milestone-summary group-start" data-summary="pre"><ol class="ms-track"></ol></td>
+        <td class="milestone-summary group-start" data-summary="print"><ol class="ms-track"></ol></td>
+        <td class="col-locs num group-start rollout-row__locations"></td>
+        <td class="milestone-summary" data-summary="ship"><ol class="ms-track"></ol></td>
+        <td class="milestone-summary group-start" data-summary="acct"><ol class="ms-track"></ol></td>
       </tr>
 
     </template>
 
-    <!-- The cell IS the button that opens the flyout. Status comes from
-         a modifier on the <td>: is-done, is-due, is-late, is-upcoming,
-         is-empty; is-selected while its flyout is open. -->
-    <template id="milestoneCellTemplate">
-      <td class="milestone">
-        <button class="ms-cell" type="button">
-          <span class="ms-cell__top">
-            <span class="status-dot"></span>
-            <span class="ms-cell__date"></span>
-            <i class="fa-regular fa-comment ms-cell__note" aria-hidden="true" hidden></i>
-          </span>
-          <span class="ms-cell__sub"></span>
+
+    <!-- One milestone on a track: link to the next dot, the dot (opens
+         the flyout), and its pill label (shows on hover / focus). -->
+    <template id="msStepTemplate">
+      <li class="ms-track__step">
+        <!-- Line from this dot to the next; as wide as the step, so it
+             stretches with the cell. Hidden on the last step. -->
+        <span class="ms-track__link" aria-hidden="true"></span>
+        <button class="ms-track__dot" type="button"></button>
+        <span class="ms-track__label" aria-hidden="true">
+          <strong class="ms-track__name"></strong>
+          <span class="ms-track__date"></span>
+        </span>
+      </li>
+    </template>
+
+
+
+    <!-- ── Board templates ───────────────────────────────────
+         A lane: header (milestone, its department, count) and the card
+         list. is-collapsed turns an empty lane into a rail. -->
+    <template id="boardLaneTemplate">
+      <section class="lane">
+        <button class="lane-header" type="button" aria-expanded="true">
+          <span class="lane-title"></span>
+          <span class="lane-dept"></span>
+          <span class="lane-count"></span>
         </button>
-      </td>
+        <div class="lane-cards">
+          <!-- rolloutCardTemplate cards, or the empty note -->
+          <p class="lane-empty" hidden>No rollouts here</p>
+        </div>
+      </section>
     </template>
 
-    <template id="groupSummaryTemplate">
-      <td class="milestone-summary group-start" hidden>
-        <span class="status-dot"></span>
-        <span class="milestone-summary__text"></span>
-      </td>
+    <!-- A rollout on the board. The edit button covers the card (its
+         ::after), so the whole card opens the flyout; the rollout name
+         is a real link sitting above it. The stripe is the status of the
+         milestone the card is waiting on. -->
+    <template id="rolloutCardTemplate">
+      <article class="rollout-card">
+        <div class="rollout-card__body">
+          <span class="rollout-card__customer"></span>
+          <a class="rollout-card__name" href="#"></a>
+          <span class="rollout-card__size"></span>
+          <!-- CSR, then Sales (components/avatar). -->
+          <span class="avatar-group rollout-card__people">
+            <span class="avatar" data-role="csr"></span>
+            <span class="avatar" data-role="sales"></span>
+          </span>
+          <span class="rollout-card__status">
+            <span class="status-dot"></span>
+            <span class="rollout-card__date"></span>
+            <span class="rollout-card__sub"></span>
+            <i class="fa-regular fa-comment rollout-card__note" aria-hidden="true" hidden></i>
+          </span>
+          <button class="rollout-card__edit" type="button"></button>
+        </div>
+        <span class="rollout-card__stripe" aria-hidden="true"></span>
+      </article>
     </template>
-
-
 
     <!-- ── Gantt templates ─────────────────────────────────── -->
     <template id="ganttWeekTemplate">
@@ -343,10 +434,11 @@
     const { TODAY, toISO, shortDate, milestoneStatus, STATES, SEVERITY } = window.RolloutStatus;
 
     /* The milestone list, read from header row 2. */
-    const MILESTONES = [...document.querySelectorAll("th[data-milestone]")]
-      .map(th => ({ key: th.dataset.milestone, label: th.textContent.trim(), group: th.dataset.group }));
-    const GROUP_NAMES = Object.fromEntries([...document.querySelectorAll("[data-group-toggle]")]
-      .map(b => [b.dataset.groupToggle, b.querySelector(".milestone-group__name").textContent.trim()]));
+    const MILESTONES = [...document.querySelectorAll(".ms-track-head__name[data-milestone]")]
+      .map(li => ({ key: li.dataset.milestone, label: li.textContent.trim(),
+                    group: li.closest("th[data-group]").dataset.group }));
+    const GROUP_NAMES = Object.fromEntries([...document.querySelectorAll("[data-group-head]")]
+      .map(th => [th.dataset.groupHead, th.querySelector(".milestone-group__name").textContent.trim()]));
 
     /* Dates per rollout per milestone, {target, actual, note}, ISO
        dates. Seeded from rollout.milestones; in memory only. */
@@ -360,6 +452,18 @@
        with none is one version for every location.
        ------------------------------------------------------------ */
     function summarize(data){
+      /* A summary rollout (from the planning sheet) has no master
+         tickets or addresses, only rollout.size: its products with a
+         version count and qty each, and a location count. Same result
+         shape as below. */
+      if (!data.versions){
+        const size = (data.rollout || {}).size || { products: [], locations: null };
+        const products = size.products.map(p => ({ name: p.name, locations: size.locations, total: p.qty,
+          versions: Array.from({ length: p.versions }, () => ({ name: "", qty: Math.round(p.qty / p.versions) })) }));
+        return { summary: true, products, locations: size.locations,
+                 versions: products.reduce((n, p) => n + p.versions.length, 0),
+                 total: products.reduce((n, p) => n + p.total, 0) };
+      }
       const qtys = data.qtys || {}, tierOf = data.tierOf || {};
       const onProduct = pId => Object.keys(qtys)
         .filter(k => k.split("::")[0] === pId && String(qtys[k]).trim() !== "");
@@ -387,8 +491,42 @@
     const tpl = id => document.getElementById(id).content;
     const set = (root, sel, text) => { root.querySelector(sel).textContent = text; };
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const fmtOrDash = n => n == null ? "—" : fmt(n);
+
+    /* The rollout name links into the Rollout Manager only when there
+       is a full rollout to open; a summary rollout's name is plain text
+       (an <a> with no href), and an unnamed one is hidden. */
+    function nameLink(el, data, r){
+      el.textContent = r.name || "";
+      el.hidden = !r.name;
+      if (data.versions) el.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
+      else { el.removeAttribute("href"); el.classList.add("is-static"); }
+    }
+    /* Products line: counts, the same for full and summary rollouts. */
+    const sizeText = s => `${plural(s.products.length, "product")} · ${plural(s.locations, "location")} · ${fmt(s.total)}`;
+    /* CSR and Sales avatars: initials from the people directory
+       (rollout-customers.js), data color from data-color, full name +
+       role in the tooltip. No one
+       assigned → dashed empty circle. */
+    const PEOPLE = window.ROLLOUT_PEOPLE || {};
+    const ROLE_NAMES = { csr: "CSR", sales: "Sales" };
+    const initials = name => name.split(/\s+/).map(w => w[0]).join("").toUpperCase();
+    function paintPeople(group, r){
+      group.querySelectorAll(".avatar[data-role]").forEach(av => {
+        const first = r[av.dataset.role] || "";
+        const person = PEOPLE[first] || { name: first, color: "" };
+        const full = person.name;
+        if (person.color){ av.dataset.color = person.color; av.dataset.shade = person.shade || "02"; }
+        else { delete av.dataset.color; delete av.dataset.shade; }
+        const label = `${ROLE_NAMES[av.dataset.role]}: ${full || "none"}`;
+        av.textContent = full ? initials(full) : "";
+        av.classList.toggle("is-unassigned", !full);
+        av.title = label;
+        av.setAttribute("aria-label", label);
+        av.setAttribute("role", "img");
+      });
+    }
     const rowsHost = document.getElementById("rolloutRows");
-    const collapsed = new Set();
 
     ROLLOUTS.forEach(data => {
       const r = data.rollout || {};
@@ -397,86 +535,74 @@
       const row = frag.querySelector("tr.rollout-row");
       row.dataset.rollout = r.id;
 
-      const name = row.querySelector(".rollout-row__name");
-      name.textContent = r.name || "Rollout";
-      name.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
+      nameLink(row.querySelector(".rollout-row__name"), data, r);
       const cust = row.querySelector(".rollout-row__customer");
       cust.textContent = r.customer || "—"; cust.title = r.customer || "";
-      const meta = [r.csr && "CSR " + r.csr, r.sales && "Sales " + r.sales].filter(Boolean).join(" · ");
-      const metaEl = row.querySelector(".rollout-row__meta");
-      metaEl.textContent = meta; metaEl.title = meta; metaEl.hidden = !meta;
+      paintPeople(row.querySelector(".rollout-row__people"), r);
       set(row, ".rollout-row__product-count", plural(s.products.length, "product"));
       set(row, ".rollout-row__version-count", plural(s.versions, "version"));
-      set(row, ".rollout-row__locations", fmt(s.locations));
-      set(row, ".rollout-row__total", fmt(s.total));
+      set(row, ".rollout-row__locations", fmtOrDash(s.locations));
+      set(row, ".rollout-row__total", fmtOrDash(s.total));
 
-      /* Milestone cells, then a summary cell after each group. */
-      MILESTONES.forEach((ms, i) => {
-        const td = tpl("milestoneCellTemplate").firstElementChild.cloneNode(true);
-        td.dataset.milestone = ms.key;
-        td.dataset.group = ms.group;
-        if (i === 0 || MILESTONES[i - 1].group !== ms.group) td.classList.add("group-start");
-        td.querySelector(".ms-cell").addEventListener("click", () => openFlyout(r, ms, td));
-        row.appendChild(td);
-        paintCell(td, r, ms);
-        const next = MILESTONES[i + 1];
-        if (!next || next.group !== ms.group){
-          const sum = tpl("groupSummaryTemplate").firstElementChild.cloneNode(true);
-          sum.dataset.group = ms.group;
-          sum.dataset.summary = ms.group;
-          row.appendChild(sum);
-        }
+      /* One step per milestone on its department's track. */
+      MILESTONES.forEach(ms => {
+        const step = tpl("msStepTemplate").firstElementChild.cloneNode(true);
+        step.dataset.milestone = ms.key;
+        const dot = step.querySelector(".ms-track__dot");
+        dot.addEventListener("click", () => openFlyout(r, ms, dot));
+        row.querySelector(`td[data-summary="${ms.group}"] .ms-track`).appendChild(step);
       });
       paintSummaries(row, r);
 
-
       rowsHost.appendChild(frag);
     });
-    document.getElementById("rolloutCount").textContent = ROLLOUTS.length;
 
-    function paintCell(td, r, ms){
-      const m = milestones[r.id][ms.key] || {};
-      const st = milestoneStatus(m);
-      STATES.forEach(x => td.classList.toggle("is-" + x, st.state === x));
-      td.querySelector(".status-dot").className = "status-dot status-dot--" + st.state;
-      set(td, ".ms-cell__date", shortDate(st.date) || "—");
-      set(td, ".ms-cell__sub", st.sub);
-      td.querySelector(".ms-cell__note").hidden = !m.note;
-      const btn = td.querySelector(".ms-cell");
-      btn.title = m.note || "";
-      btn.setAttribute("aria-label",
-        `${ms.label}, ${r.name}: ${st.state === "empty" ? "no dates" : shortDate(st.date) + ", " + st.sub}${m.note ? ", has a note" : ""}. Edit.`);
+    /* ── Completed filter ────────────────────────────────────────
+       A rollout is completed once Billing Done has an actual date.
+       Completed rollouts are hidden from all three views unless
+       "Show completed" is on. Re-applied after every flyout save,
+       since entering that date completes the rollout.
+       ------------------------------------------------------------ */
+    const showCompletedBox = document.getElementById("showCompleted");
+    const isCompleted = r => !!((milestones[r.id] || {}).billingCompleted || {}).actual;
+    const isVisible = r => showCompletedBox.checked || !isCompleted(r);
+    function applyCompletedFilter(){
+      let shown = 0;
+      ROLLOUTS.forEach(d => {
+        const r = d.rollout || {};
+        const row = rowsHost.querySelector(`tr.rollout-row[data-rollout="${r.id}"]`);
+        row.hidden = !isVisible(r);
+        if (!row.hidden) shown++;
+      });
+      document.getElementById("rolloutCount").textContent = shown;
     }
+    showCompletedBox.addEventListener("change", () => {
+      applyCompletedFilter(); renderGantt(); renderBoard();
+    });
+    applyCompletedFilter();
 
-    /* A collapsed group's cell: how many are done, and the worst
-       status among the rest. */
+    /* A department's track: each milestone's dot gets its status
+       (data-state), label and date; a step whose next milestone is
+       also done gets a filled link (.is-link-done). */
     function paintSummaries(row, r){
       row.querySelectorAll("td[data-summary]").forEach(td => {
-        const g = td.dataset.summary;
-        const list = MILESTONES.filter(ms => ms.group === g);
-        const states = list.map(ms => milestoneStatus(milestones[r.id][ms.key]).state);
-        const worst = SEVERITY.find(x => states.includes(x)) || "empty";
-        td.querySelector(".status-dot").className = "status-dot status-dot--" + worst;
-        set(td, ".milestone-summary__text", `${states.filter(x => x === "done").length}/${list.length} done`);
+        const steps = [...td.querySelectorAll(".ms-track__step")];
+        const states = steps.map(step => {
+          const ms = MILESTONES.find(x => x.key === step.dataset.milestone);
+          const st = milestoneStatus(milestones[r.id][ms.key]);
+          const date = shortDate(st.date) || (st.state === "done" ? "✓" : "Not scheduled");
+          step.dataset.state = st.state;
+          set(step, ".ms-track__name", ms.label);
+          set(step, ".ms-track__date", date);
+          step.querySelector(".ms-track__dot").setAttribute("aria-label",
+            `${ms.label}: ${date}${st.state === "empty" ? "" : ", " + st.sub}. Edit.`);
+          return st.state;
+        });
+        steps.forEach((step, i) =>
+          step.classList.toggle("is-link-done", states[i] === "done" && states[i + 1] === "done"));
       });
     }
 
-    /* ── Collapsing a department ─────────────────────────────── */
-    document.querySelectorAll("[data-group-toggle]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const g = btn.dataset.groupToggle;
-        const isCollapsed = !collapsed.has(g);
-        isCollapsed ? collapsed.add(g) : collapsed.delete(g);
-        btn.setAttribute("aria-expanded", !isCollapsed);
-        const head = document.querySelector(`[data-group-head="${g}"]`);
-        head.classList.toggle("is-collapsed", isCollapsed);
-        head.colSpan = isCollapsed ? 1 : MILESTONES.filter(ms => ms.group === g).length;
-        document.querySelectorAll(`[data-group="${g}"]`).forEach(el => {
-          const isSummary = el.matches(".milestone-summary, .milestone-summary-head");
-          el.hidden = isSummary ? !isCollapsed : isCollapsed;
-        });
-      });
-    });
 
 
     /* ── Gantt ───────────────────────────────────────────────────
@@ -532,10 +658,9 @@
       const place = el => { el.dataset.ganttBody = ""; el.style.gridRow = String(row); };
       ROLLOUTS.forEach(data => {
         const r = data.rollout || {};
+        if (!isVisible(r)) return;
         const head = tpl("ganttRolloutTemplate").cloneNode(true);
-        const link = head.querySelector(".gantt__rollout-name");
-        link.textContent = r.name || "Rollout";
-        link.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
+        nameLink(head.querySelector(".gantt__rollout-name"), data, r);
         set(head, ".gantt__rollout-customer", r.customer || "—");
         const [label, track] = head.children;
         place(label); place(track);
@@ -572,6 +697,7 @@
         items.filter(x => x.day >= 0 && x.day < DAYS).forEach(x => {
           const btn = tpl("ganttMarkerTemplate").firstElementChild.cloneNode(true);
           btn.dataset.marker = `${r.id}:${x.ms.key}`;
+          btn.dataset.refocus = `.gantt__marker[data-marker="${r.id}:${x.ms.key}"]`;
           btn.style.gridColumn = String(x.day + 1);
           btn.classList.add("is-" + x.st.state);
           btn.querySelector(".status-dot").className = "status-dot status-dot--" + x.st.state;
@@ -599,6 +725,136 @@
     }
     renderGantt();
 
+    /* ── Board ───────────────────────────────────────────────────
+       Lanes: every milestone in order; Billing Done is the last. A
+       rollout's lane is its first milestone that is not done; one with
+       everything done sits in Billing Done as complete. Each lane
+       carries its department (data-group) for the lane colour.
+       ------------------------------------------------------------ */
+    const kanban = document.getElementById("kanban");
+    const LANES = MILESTONES.map(ms => ({ key: ms.key, title: ms.label, dept: GROUP_NAMES[ms.group], group: ms.group, ms }));
+    const LAST_LANE = LANES[LANES.length - 1].key;
+    const openLanes = new Set();     // empty lanes the user opened
+    let allEmptyOpen = false;
+
+    const isDone = m => !!(m && (m.actual || m.done));
+    const currentMilestone = r =>
+      MILESTONES.find(ms => !isDone(milestones[r.id][ms.key])) || null;
+
+    function renderBoard(){
+      kanban.replaceChildren();
+      const byLane = Object.fromEntries(LANES.map(l => [l.key, []]));
+      ROLLOUTS.forEach(data => {
+        const r = data.rollout || {};
+        if (!isVisible(r)) return;
+        const ms = currentMilestone(r);
+        byLane[ms ? ms.key : LAST_LANE].push({ data, r, ms });
+      });
+
+      LANES.forEach(lane => {
+        const el = tpl("boardLaneTemplate").firstElementChild.cloneNode(true);
+        const items = byLane[lane.key];
+        const collapsed = !items.length && !allEmptyOpen && !openLanes.has(lane.key);
+        el.dataset.lane = lane.key;
+        el.classList.toggle("is-collapsed", collapsed);
+        el.dataset.group = lane.group;
+        set(el, ".lane-title", lane.title);
+        set(el, ".lane-dept", lane.dept);
+        set(el, ".lane-count", items.length);
+        const head = el.querySelector(".lane-header");
+        head.setAttribute("aria-expanded", !collapsed);
+        head.addEventListener("click", () => {
+          if (items.length) return;              // lanes with cards stay open
+          openLanes.has(lane.key) ? openLanes.delete(lane.key) : openLanes.add(lane.key);
+          renderBoard();
+        });
+        const list = el.querySelector(".lane-cards");
+        list.querySelector(".lane-empty").hidden = !!items.length;
+        items.forEach(({ data, r, ms }) => list.appendChild(rolloutCard(data, r, ms)));
+        kanban.appendChild(el);
+      });
+
+      const empty = LANES.filter(l => !byLane[l.key].length).length;
+      const t = document.getElementById("boardToggleEmpty");
+      t.hidden = !empty;
+      t.textContent = `${allEmptyOpen ? "Collapse" : "Expand"} ${empty} empty lane${empty === 1 ? "" : "s"}`;
+    }
+
+    function rolloutCard(data, r, ms){
+      const card = tpl("rolloutCardTemplate").firstElementChild.cloneNode(true);
+      const s = summarize(data);
+      set(card, ".rollout-card__customer", r.customer || "—");
+      nameLink(card.querySelector(".rollout-card__name"), data, r);
+      paintPeople(card.querySelector(".rollout-card__people"), r);
+      set(card, ".rollout-card__size", sizeText(s));
+
+      const btn = card.querySelector(".rollout-card__edit");
+      btn.dataset.rollout = r.id;
+      btn.dataset.refocus = `.rollout-card__edit[data-rollout="${r.id}"]`;
+      if (!ms){
+        /* Complete: nothing left to update here. */
+        card.classList.add("is-done");
+        card.querySelector(".status-dot").className = "status-dot status-dot--done";
+        set(card, ".rollout-card__date", "");
+        set(card, ".rollout-card__sub", "All milestones done");
+        btn.remove();
+        return card;
+      }
+      const m = milestones[r.id][ms.key] || {};
+      const st = milestoneStatus(m);
+      card.classList.add("is-" + st.state);
+      card.querySelector(".status-dot").className = "status-dot status-dot--" + st.state;
+      set(card, ".rollout-card__date", shortDate(st.date) || (st.state === "done" ? "✓" : "Not scheduled"));
+      set(card, ".rollout-card__sub", st.state === "empty" ? "" : st.sub);
+      card.querySelector(".rollout-card__note").hidden = !m.note;
+      btn.setAttribute("aria-label", `Update ${ms.label} for ${r.customer}${r.name ? " " + r.name : ""}`);
+      btn.title = m.note || "";
+      btn.addEventListener("click", () => openFlyout(r, ms, btn));
+      return card;
+    }
+
+    document.getElementById("boardToggleEmpty").addEventListener("click", () => {
+      allEmptyOpen = !allEmptyOpen;
+      openLanes.clear();
+      renderBoard();
+    });
+    renderBoard();
+
+    /* ── Drag to pan ─────────────────────────────────────────────
+       Trello-style, lifted from PL-JOBS-DASHBOARDS/person-dashboard.js:
+       grab the board anywhere that isn't a card or a lane header and
+       drag it sideways. Pointer capture keeps the drag alive off the
+       board, and a drag of more than a few pixels swallows the click
+       so panning never opens a card.
+       ------------------------------------------------------------ */
+    (function initPanning(){
+      let panning = false, startX = 0, startScroll = 0, moved = 0;
+      kanban.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        if (e.target.closest(".rollout-card, .lane-header")) return;
+        panning = true; moved = 0;
+        startX = e.clientX; startScroll = kanban.scrollLeft;
+        kanban.setPointerCapture(e.pointerId);
+        kanban.classList.add("is-panning");
+      });
+      kanban.addEventListener("pointermove", e => {
+        if (!panning) return;
+        const dx = e.clientX - startX;
+        moved = Math.max(moved, Math.abs(dx));
+        kanban.scrollLeft = startScroll - dx;
+      });
+      function endPan(e){
+        if (!panning) return;
+        panning = false;
+        kanban.releasePointerCapture(e.pointerId);
+        kanban.classList.remove("is-panning");
+        if (moved > 4) kanban.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); },
+                                               { capture: true, once: true });
+      }
+      kanban.addEventListener("pointerup", endPan);
+      kanban.addEventListener("pointercancel", endPan);
+    })();
+
     /* ── View switch ─────────────────────────────────────────── */
     document.querySelectorAll("[data-view]").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -610,6 +866,7 @@
         });
         document.querySelector(".rollout-scroller").hidden = view !== "table";
         document.getElementById("ganttView").hidden = view !== "gantt";
+        document.getElementById("boardView").hidden = view !== "board";
         document.querySelectorAll("[data-hint]").forEach(h => { h.hidden = h.dataset.hint !== view; });
       });
     });
@@ -648,7 +905,7 @@
       const { origin } = editing;
       flyout.classList.remove("open");
       origin.classList.remove("is-selected");
-      (origin.matches("td") ? origin.querySelector(".ms-cell") : origin).focus();
+      origin.focus();
       editing = null;
     }
 
@@ -657,17 +914,23 @@
     function saveFlyout(){
       if (!editing) return;
       const { r, ms, origin } = editing;
+      const prev = milestones[r.id][ms.key] || {};
       const next = { target: fTarget.value, actual: fActual.value, note: fNote.value.trim() };
-      if (next.target || next.actual || next.note) milestones[r.id][ms.key] = next;
+      /* A sheet tick (done, no date) survives an edit until an actual
+         date replaces it. */
+      if (prev.done && !next.actual) next.done = true;
+      if (next.target || next.actual || next.note || next.done) milestones[r.id][ms.key] = next;
       else delete milestones[r.id][ms.key];
-      const td = document.querySelector(`tr.rollout-row[data-rollout="${r.id}"] td[data-milestone="${ms.key}"]`);
-      paintCell(td, r, ms);
-      paintSummaries(td.closest("tr"), r);
-      const fromGantt = !origin.matches("td");
+      paintSummaries(document.querySelector(`tr.rollout-row[data-rollout="${r.id}"]`), r);
+      /* Gantt dots and board cards are rebuilt, so focus goes back to
+         the rebuilt element named by the origin's data-refocus. */
+      const refocus = origin.dataset.refocus;
       closeFlyout();
+      applyCompletedFilter();
       renderGantt();
-      if (fromGantt){
-        const again = document.querySelector(`.gantt__marker[data-marker="${r.id}:${ms.key}"]`);
+      renderBoard();
+      if (refocus){
+        const again = document.querySelector(refocus);
         again && again.focus();
       }
     }
@@ -696,6 +959,10 @@
            Breadcrumbs     → .breadcrumb-bar, components/breadcrumbs/breadcrumbs.css
            DashTopbar      → <header class="dash-topbar">, .dash-topbar / .dash-title
            ViewToggle      → .view-toggle in the topbar (Table / Gantt), aria-pressed
+           Board           → #boardView > .kanban; boardLaneTemplate (.lane,
+                             .lane-header, .lane-cards), rolloutCardTemplate
+                             (.rollout-card, stripe = status); lane and card
+                             pattern from PL-JOBS-DASHBOARDS/jobs-dashboard.css
            Gantt           → #ganttView > .gantt (one CSS grid: label column +
                              21 day columns); ganttWeekTemplate, ganttDayTemplate,
                              ganttRolloutTemplate, ganttBarTemplate,
@@ -703,13 +970,12 @@
            StatusLegend    → .status-legend markup + styles; the dot is
                              components/status-dot/status-dot.css
            RolloutList     → <table class="rollout-list"> in .rollout-scroller
-           MilestoneHeads  → two-row <thead>: th.milestone-group (with its
-                             collapse toggle) over th.milestone-head[data-milestone]
-                             and a hidden th.milestone-summary-head per group
+           MilestoneHeads  → two-row <thead>: th.milestone-group over
+                             th.milestone-summary-head, whose ol.ms-track-head
+                             li[data-milestone] is the milestone list
            RolloutRow      → rolloutRowTemplate (tr.rollout-row), .rollout-row__*
-           MilestoneCell   → milestoneCellTemplate (td.milestone > button.ms-cell),
-                             .milestone / .ms-cell__* styles; status on the td
-           GroupSummary    → groupSummaryTemplate (td.milestone-summary)
+           MilestoneTrack  → td.milestone-summary[data-summary] in the row
+                             template, msStepTemplate per milestone; .ms-track*
            MilestoneFlyout → #milestoneFlyout — the shared flyout
                              (components/flyout/flyout.css, copied unchanged
                              from Inventory Quantity Upgrade) with
@@ -729,9 +995,25 @@
            due       target within 3 days — "Due in 2d", copper fill
            upcoming  later target — hollow dot, "Target"
            empty     nothing set — "Set dates"
-           A collapsed group shows "N/M done" and its worst status.
            This is the computed replacement for the spreadsheet's Status
            Check column.
+
+         Board
+           One lane per milestone, in order; Billing Done is the last. A
+           rollout's lane is its first milestone not done (currentMilestone();
+           an actual date or a sheet tick counts as done), so entering an
+           actual moves the card one lane right; a rollout with everything
+           done sits in Billing Done. Each lane's top edge is its department
+           colour (the PL-JOBS-DASHBOARDS lane accent, keyed by data-group).
+           Drag the board background to pan sideways (initPanning(), from
+           PL-JOBS-DASHBOARDS/person-dashboard.js). Empty lanes
+           are 44px rails with a vertical label, as on the department board;
+           click one to open it, or "Expand N empty lanes". The card shows
+           customer (heaviest), rollout name (link), size, and the waiting
+           milestone's date and status; its right stripe is that status.
+           Clicking the card opens the flyout for that milestone. Cards are
+           not draggable — a rollout's lane is derived from its dates, so the
+           way to move one is to record the actual.
 
          Gantt
            Last week, this week and next week (Mon–Sun, 21 days) around
@@ -753,9 +1035,6 @@
            - Rows and cells are cloned from the templates → @for over
              rollouts, and over the milestone list inside each row.
            - Status is computed on paint from TODAY → a pure function / pipe.
-           - Group collapse flips `hidden` on that group's cells and the
-             group header's colspan → a collapsed-groups set in component
-             state (persist per user if wanted).
            - The flyout: openFlyout() fills it, saveFlyout() writes the
              in-memory `milestones` object and repaints. Enter saves (Shift+
              Enter for a new line in the note), Esc / Cancel / overlay
@@ -763,6 +1042,40 @@
            - summarize() and rollout-status.js (milestoneStatus() and the date
              helpers, shared with the manager's Overview) move to the
              rollout service.
+
+         Milestone track (the only table view)
+           Each department is one td with an ol.ms-track; msStepTemplate is
+           one li per milestone (link + dot button + pill label); the header
+           th holds the same grid with the names, so they line up.
+           paintSummaries() sets data-state per step and .is-link-done where
+           a milestone and the next are both done; the pill shows on :hover /
+           :focus-visible in CSS. There is no expanded date view here — the
+           dates are on the rollout's Overview timeline.
+           Angular: a <milestone-track> component with @for over the group.
+
+         People avatars (components/avatar/avatar.css)
+           .avatar-group with a CSR and a Sales .avatar, on the right of
+           the Customer / Rollout cell and above the status on a board
+           card. paintPeople() fills initials, data-color / data-shade + tooltip from
+           window.ROLLOUT_PEOPLE (rollout-customers.js); an empty role is
+           .is-unassigned. Becomes a shared <app-avatar> fed by the user
+           directory.
+
+         Show completed (switch at the right of the status legend, components/switch/switch.css)
+           isCompleted(r) = Billing Done has an actual date. Off by default:
+           applyCompletedFilter() sets hidden on completed table rows and
+           updates the count; renderGantt() / renderBoard() skip them.
+           Becomes a showCompleted signal / filter pipe in Angular.
+
+         Summary rollouts
+           rollout-data-board.js holds the other 40 rows of the Rollouts
+           Planning & Production Board sheet: customer, name, CSR, sales,
+           Quantity / Press Run text and milestones, plus rollout.size
+           (products with versions + qty, and a location count; partly
+           made up). summarize() turns size into the same shape it builds
+           for a full rollout, so Products / Locations / Total qty read the
+           same for both. The rollout name is not a link (nameLink()). A
+           tick on the sheet is stored as done: true.
 
          Only there to make the prototype demonstrable
            - window.ROLLOUTS from the three rollout-data*.js files; the

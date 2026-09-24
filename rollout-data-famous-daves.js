@@ -30,40 +30,41 @@
 (window.ROLLOUTS = window.ROLLOUTS || {})["famous-daves-corp"] = {
   "rollout": {
     "id": "famous-daves-corp",
-    "_milestonesNote": "SAMPLE dates for the dashboard demo, relative to 9/22/2026.",
+    "pressRun": "Dine In 3,400; To Go 84,000; Kids 29,015; Pig Hats 25,500; Catering 18,000",
+    "_milestonesNote": "From the Rollouts Planning & Production Board sheet, 9/23/2026. Ticked milestones with no date on the sheet have made-up actual dates.",
     "milestones": {
       "filesReceived": {
-        "target": "2026-09-14",
-        "actual": "2026-09-15"
+        "actual": "2026-09-04"
       },
       "tickets": {
-        "target": "2026-09-18",
-        "actual": "2026-09-18"
+        "actual": "2026-09-04"
       },
       "initialProofOut": {
-        "target": "2026-09-24",
-        "note": "To Go Menu v4 copy still with client."
+        "actual": "2026-09-04"
       },
       "filesApproved": {
-        "target": "2026-10-01"
+        "actual": "2026-09-08"
       },
       "printed": {
-        "target": "2026-10-12"
+        "done": true,
+        "actual": "2026-09-10"
       },
       "cut": {
-        "target": "2026-10-14"
+        "done": true,
+        "actual": "2026-09-14"
       },
       "finishing": {
-        "target": "2026-10-16"
+        "note": "Outside services"
       },
       "shipDate": {
-        "target": "2026-10-20"
+        "done": true,
+        "actual": "2026-09-16"
       },
-      "billingPrep": {
-        "target": "2026-10-23"
+      "onProperty": {
+        "target": "2026-09-18"
       },
-      "billingCompleted": {
-        "target": "2026-10-30"
+      "goesLive": {
+        "target": "2026-09-23"
       }
     },
     "customer": "(3244) Famous Dave's Corporate",

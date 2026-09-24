@@ -4,13 +4,16 @@
    ------------------------------------------------------------
    The real domain logic, written plainly so it can move into a
    rollout service as-is. A milestone is {target, actual, note}
-   with ISO dates ("2026-09-24").
+   with ISO dates ("2026-09-24"), and optionally done: true.
 
      done      actual is set     shows actual, "Done", ± days vs target
      late      target passed, no actual
      due       target within DUE_SOON_DAYS, no actual
      upcoming  target further out
      empty     nothing set
+
+   A milestone may also carry `done: true` with no actual date (the
+   sheet ticked it but did not say when); it counts as done.
    ============================================================ */
 (function(){
   /* Status is measured against today. Pin this to a fixed date
@@ -36,6 +39,8 @@
       return { state: "done", date: m.actual,
                sub: d > 0 ? `Done · +${d}d` : d < 0 ? `Done · −${-d}d` : "Done" };
     }
+    /* Done without a date — a tick on the planning sheet. */
+    if (m.done) return { state: "done", date: "", sub: "Done" };
     if (target){
       const d = daysBetween(target, TODAY);
       if (d < 0) return { state: "late", date: m.target, sub: `${-d}d late` };

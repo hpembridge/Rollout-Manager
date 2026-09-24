@@ -8,8 +8,8 @@
    Order matches the markup: Local tokens → App shell → Topbar
    → View toggle
    → Status legend → Rollout list → Sticky column → Rollout row
-   → Milestone groups → Milestone cell → Group summary
-   → Gantt → Milestone flyout → Fields → Utilities
+   → Milestone groups → Milestone track
+   → Gantt → Board → Milestone flyout → Fields → Utilities
    ============================================================ */
 
 /* ── Local tokens ──────────────────────────────────────────────
@@ -21,7 +21,6 @@
   --dash-col-products: 120px;
   --dash-col-locs: 84px;
   --dash-col-qty: 88px;
-  --dash-col-milestone: 96px;
   --dash-head-row: var(--scale-900);
 
   /* Gantt geometry: the label column, the narrowest a day may get,
@@ -81,8 +80,15 @@ body {
   font-weight: var(--font-weight-light);
 }
 
+/* Right side of the topbar: the view toggle. */
+.dash-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-500);
+}
+
 /* ── View toggle ───────────────────────────────────────────────
-   Two joined buttons; the pressed one is filled.
+   Joined buttons (Table / Gantt / Board); the pressed one is filled.
    ------------------------------------------------------------- */
 .view-toggle {
   display: inline-flex;
@@ -135,6 +141,9 @@ body {
 }
 .status-legend__item { display: inline-flex; align-items: center; gap: var(--scale-100); }
 .status-legend__hint { margin: 0; color: var(--text-tertiary); }
+/* Right side of the legend row: the view's hint (Gantt / Board), then
+   the Show completed switch. */
+.status-legend__end { display: flex; align-items: center; gap: var(--scale-500); }
 
 /* The dot itself is components/status-dot/status-dot.css. */
 
@@ -149,8 +158,8 @@ body {
   border-radius: var(--border-radius-md);
 }
 
-/* Auto layout so a collapsed group's hidden columns drop out
-   cleanly; the widths below are held with width + min-width. */
+/* Auto layout: the fixed columns hold their widths with width +
+   min-width; the department tracks share whatever is left. */
 .rollout-list {
   width: max-content;
   min-width: 100%;
@@ -161,10 +170,9 @@ body {
 .rollout-list .col-products { width: var(--dash-col-products); min-width: var(--dash-col-products); }
 .rollout-list .col-locs     { width: var(--dash-col-locs);     min-width: var(--dash-col-locs); }
 .rollout-list .col-qty      { width: var(--dash-col-qty);      min-width: var(--dash-col-qty); }
-.rollout-list .milestone-head,
+/* A department is as wide as its track. */
 .rollout-list .milestone-summary-head,
-.rollout-list td.milestone,
-.rollout-list td.milestone-summary { width: var(--dash-col-milestone); min-width: var(--dash-col-milestone); }
+.rollout-list td.milestone-summary { width: auto; }
 
 .rollout-list > thead th {
   position: sticky;
@@ -207,7 +215,20 @@ body {
 }
 
 /* Customer / Rollout: the customer carries the weight, the rollout
-   name (a link into it) comes second, CSR and Sales last and quiet. */
+   name (a link into it) comes second; CSR and Sales avatars sit on
+   the right edge of the cell. */
+.rollout-row__client-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-200);
+}
+.rollout-row__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rollout-row__people { flex: none; }
 .rollout-row__customer {
   display: block;
   overflow: hidden;
@@ -218,14 +239,8 @@ body {
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
 }
-.rollout-row__sub {
-  display: flex;
-  align-items: baseline;
-  gap: var(--scale-200);
-  min-width: 0;
-}
 .rollout-row__name {
-  flex: none;
+  align-self: flex-start;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -235,112 +250,132 @@ body {
   text-decoration: none;
 }
 .rollout-row__name:hover { text-decoration: underline; }
-.rollout-row__meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-tertiary);
-}
-.rollout-row__meta[hidden] { display: none; }
+/* No full rollout to open: the name reads as text, not a link. */
+.rollout-row__name.is-static,
+.gantt__rollout-name.is-static,
+.rollout-card__name.is-static { color: var(--text-secondary); text-decoration: none; cursor: inherit; }
+.gantt__rollout-name[hidden],
+.rollout-card__name[hidden] { display: none; }
+
 
 /* Products: how many, and how many versions. The breakdown is on
    the rollout's Overview tab. */
 .rollout-row__products > span { display: block; }
 .rollout-row__version-count { color: var(--text-tertiary); }
+.rollout-row__products > span[hidden] { display: none; }
 
 .rollout-row__total { font-weight: var(--font-weight-semibold); }
 
 /* ══ Milestone groups ═════════════════════════════════════════
-   Each department header is a button that collapses its columns
-   to one Progress column.
+   Department name over its track (Pre-Production also names who
+   owns it).
    ───────────────────────────────────────────────────────────── */
 .rollout-list > thead th.milestone-group { vertical-align: middle; }
-.milestone-group__toggle {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--scale-200);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.milestone-group__toggle i {
-  font-size: var(--fontsize-label);
-  color: var(--text-tertiary);
-  transition: transform .15s ease;
-}
-.milestone-group.is-collapsed .milestone-group__toggle i { transform: rotate(-90deg); }
-.milestone-group__toggle:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.milestone-group__owner { color: var(--text-tertiary); font-weight: var(--font-weight-light); }
-/* A collapsed group is one narrow column; its name is enough. */
-.milestone-group.is-collapsed .milestone-group__owner { display: none; }
+.milestone-group__owner { color: var(--text-tertiary); font-weight: var(--font-weight-light); margin-left: var(--scale-100); }
 
-.rollout-list > thead th.milestone-head,
 .rollout-list > thead th.milestone-summary-head {
   white-space: normal;
   line-height: var(--line-height-label);
 }
 
-/* ══ Milestone cell ═══════════════════════════════════════════
-   Dot + date over a one-line status. The fill says it at a glance:
-   red for late, copper for due soon, nothing otherwise.
-   ───────────────────────────────────────────────────────────── */
-.rollout-row > td.milestone { padding: var(--scale-100); }
 
-.ms-cell {
-  appearance: none;
+/* ── Milestone track ─────────────────────────────
+   A department's cell: one grid column per milestone,
+   each at least --ms-step-min and sharing any spare width, the dot
+   centred in it. .ms-track__link runs from a dot's centre to the
+   next one's (100% of the column), so the track stretches with the
+   cell. The header row uses the same grid for the names.
+   The dot takes its status from data-state on the step; hover /
+   focus shows a pill label above it in the same status colors.
+   ------------------------------------------------------------- */
+:root { --ms-step-min: 64px; --ms-dot: 14px; }
+.rollout-row > td.milestone-summary,
+.rollout-list > thead th.milestone-summary-head { padding-inline: 0; }
+.ms-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(var(--ms-step-min), 1fr);
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Header: the names, centred over their dots. */
+.ms-track-head__name {
+  padding: 0 var(--scale-100);
+  text-align: center;
+  white-space: normal;
+}
+.ms-track__step {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--scale-25);
+  justify-content: center;
+  align-items: center;
+  min-height: var(--scale-600);
+  /* Status pair, used by the dot and its pill: light fill, 1px border. */
+  --step-bg: var(--status-neutral-bg);
+  --step-border: var(--border-tertiary);
+  --dot-bg: var(--border-tertiary);      /* not done: a solid light-gray dot */
+}
+.ms-track__step[data-state="done"] { --step-bg: var(--status-success-bg); --step-border: var(--status-success-border); --dot-bg: var(--step-bg); }
+.ms-track__step[data-state="due"]  { --step-bg: var(--status-warning-bg); --step-border: var(--status-warning-border); --dot-bg: var(--step-border); }
+.ms-track__step[data-state="late"] { --step-bg: var(--status-error-bg);   --step-border: var(--status-error-border);   --dot-bg: var(--step-border); }
+
+.ms-track__link {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   width: 100%;
-  padding: var(--scale-100) var(--scale-200);
-  border: 1px solid transparent;
-  border-radius: var(--border-radius-sm);
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
+  height: 1px;
+  translate: 0 -50%;
+  background: var(--border-tertiary);
+}
+.ms-track__step:last-child .ms-track__link { display: none; }
+.ms-track__step.is-link-done .ms-track__link { background: var(--status-success-border); }
+
+.ms-track__dot {
+  position: relative;      /* above the link */
+  flex: none;
+  width: var(--ms-dot);
+  height: var(--ms-dot);
+  padding: 0;
+  border: 1px solid var(--step-border);
+  border-radius: var(--border-radius-full);
+  background: var(--dot-bg);
   cursor: pointer;
+  transition: transform 90ms ease;
 }
-.ms-cell:hover { border-color: var(--border-subtle); }
-.ms-cell:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 0; }
+/* Due and late need attention: solid dots (--dot-bg above). */
+.ms-track__dot:hover,
+.ms-track__dot:focus-visible,
+.ms-track__dot.is-selected { transform: scale(1.3); }
+.ms-track__dot:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
-.ms-cell__top { display: flex; align-items: center; gap: var(--scale-100); }
-.ms-cell__date { font-weight: var(--font-weight-semibold); }
-.ms-cell__note { color: var(--text-tertiary); font-size: var(--fontsize-label); }
-.ms-cell__note[hidden] { display: none; }
-.ms-cell__sub {
-  color: var(--text-tertiary);
-  font-size: var(--fontsize-label);
-  line-height: var(--line-height-label);
+/* Pill label, centred over its dot. */
+.ms-track__label {
+  position: absolute;
+  bottom: calc(50% + var(--ms-dot) / 2 + var(--scale-100));
+  left: 50%;
+  z-index: 5;
+  translate: -50% 0;
+  display: none;
+  padding: var(--scale-50) var(--scale-300);
+  border: 1px solid var(--step-border);
+  border-radius: var(--border-radius-full);
+  background: var(--step-bg);
+  color: var(--text-primary);
   white-space: nowrap;
+  pointer-events: none;
 }
+.ms-track__name { font-weight: var(--font-weight-semibold); }
+.ms-track__date { font-weight: var(--font-weight-light); }
+.ms-track__dot:hover ~ .ms-track__label,
+.ms-track__dot:focus-visible ~ .ms-track__label,
+.ms-track__dot.is-selected ~ .ms-track__label { display: block; }
 
-/* States. Late and due sub-text is --text-primary, not red: see the
-   token note in the implementation notes. */
-td.is-late .ms-cell { background: var(--status-error-bg); }
-td.is-due  .ms-cell { background: var(--status-warning-bg); }
-td.is-late .ms-cell__sub,
-td.is-due  .ms-cell__sub { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
-td.is-upcoming .ms-cell__date { font-weight: var(--font-weight-book); color: var(--text-secondary); }
-td.is-empty .ms-cell__date { color: var(--border-subtle); font-weight: var(--font-weight-light); }
-td.is-empty .ms-cell__sub { visibility: hidden; }
-td.is-empty .ms-cell:hover .ms-cell__sub { visibility: visible; color: var(--text-interactive); }
-
-/* The cell whose flyout is open. */
-td.is-selected .ms-cell {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 1px var(--border-focus);
+@media (prefers-reduced-motion: reduce) {
+  .ms-track__dot { transition: none; }
 }
-
-/* ── Group summary ─────────────────────────────────────────── */
-.rollout-row > td.milestone-summary { white-space: nowrap; }
-.milestone-summary { color: var(--text-secondary); }
-.milestone-summary .status-dot { margin-right: var(--scale-100); vertical-align: middle; }
 
 /* ══ Gantt ════════════════════════════════════════════════════
    One grid: the label column and 21 day columns. Header rows 1–2
@@ -527,6 +562,255 @@ td.is-selected .ms-cell {
 .gantt__more--before { left: var(--scale-100); }
 .gantt__more--after { right: var(--scale-100); }
 
+/* ══ Board ════════════════════════════════════════════════════
+   Kanban, after PL-JOBS-DASHBOARDS/jobs-dashboard.css: the same
+   lane, collapsed-rail and card-with-stripe pattern, on this page's
+   tokens. Lanes fill the height and scroll their own cards; the
+   board scrolls sideways.
+   ───────────────────────────────────────────────────────────── */
+.board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-200);
+}
+.board[hidden] { display: none; }
+.board__toolbar { display: flex; justify-content: flex-end; }
+
+.text-btn {
+  appearance: none;
+  padding: var(--scale-100);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-tertiary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.text-btn:hover { color: var(--text-primary); }
+.text-btn[hidden] { display: none; }
+
+.kanban {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--scale-300);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--scale-200);
+}
+
+/* Drag to pan — as PL-JOBS-DASHBOARDS/lane-management.css: the board
+   is grabbable anywhere that isn't a card or a lane header. */
+.kanban { cursor: grab; }
+.kanban.is-panning { cursor: grabbing; user-select: none; scroll-behavior: auto; }
+.kanban .rollout-card { cursor: pointer; }
+
+/* ── Lane ──
+   The top edge carries the lane's colour, as on the jobs boards
+   (--tile-accent there). Here it is the milestone's department, so
+   the board reads left to right as Pre-Production → Print → Shipping
+   → Accounting. Same datacolor-03 shades the jobs boards use. */
+.lane[data-group="pre"]   { --lane-accent: var(--datacolor-grape-03); }
+.lane[data-group="print"] { --lane-accent: var(--datacolor-blueberry-03); }
+.lane[data-group="ship"]  { --lane-accent: var(--datacolor-orange-03); }
+.lane[data-group="acct"]  { --lane-accent: var(--datacolor-mint-03); }
+.lane {
+  flex: 0 0 272px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+  border-top: 3px solid var(--lane-accent, var(--border-default));
+  border-radius: var(--border-radius-md);
+}
+.lane-header {
+  appearance: none;
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title count" "dept count";
+  align-items: center;
+  column-gap: var(--scale-200);
+  width: 100%;
+  padding: var(--scale-300) var(--scale-300);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+.lane-title {
+  grid-area: title;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.lane-dept {
+  grid-area: dept;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+}
+.lane-count {
+  grid-area: count;
+  padding: 0 var(--scale-200);
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-full);
+  background: var(--bg-surface);
+  font-size: var(--fontsize-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+}
+.lane-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-200);
+  padding: var(--scale-300);
+}
+.lane-empty {
+  margin: 0;
+  padding: var(--scale-500) var(--scale-200);
+  border: 1px dashed var(--border-tertiary);
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+}
+.lane-empty[hidden] { display: none; }
+
+/* An empty lane that was opened can be closed again from its header. */
+.lane:has(.lane-empty:not([hidden])) .lane-header { cursor: pointer; }
+.lane:has(.lane-empty:not([hidden])) .lane-header:hover .lane-title { color: var(--text-interactive); }
+
+/* Collapsed: an empty lane becomes a 44px rail with a vertical label. */
+.lane.is-collapsed {
+  flex: 0 0 var(--scale-1100);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border-tertiary);
+  border-top: 3px solid var(--lane-accent, var(--border-default));
+}
+.lane.is-collapsed .lane-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--scale-300);
+  height: 100%;
+  padding: var(--scale-300) var(--scale-100);
+  border-bottom: 0;
+  cursor: pointer;
+}
+.lane.is-collapsed .lane-title {
+  writing-mode: vertical-rl;
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+}
+.lane.is-collapsed .lane-header:hover .lane-title { color: var(--text-interactive); }
+.lane.is-collapsed .lane-dept { display: none; }
+.lane.is-collapsed .lane-count { order: -1; padding: 0 var(--scale-100); }
+.lane.is-collapsed .lane-cards { display: none; }
+.lane-header:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+/* ── Rollout card ──
+   Customer carries the weight, then the rollout (a link), its size,
+   and the milestone it is waiting on. Stripe on the right = status. */
+.rollout-card {
+  --card-status: var(--border-default);
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.rollout-card.is-done { --card-status: var(--status-success-border); }
+.rollout-card.is-due  { --card-status: var(--status-warning-border); }
+.rollout-card.is-late { --card-status: var(--status-error-border); }
+.rollout-card:hover { box-shadow: 0 3px 10px rgb(from var(--color-black) r g b / .12); transform: translateY(-1px); }
+.rollout-card:has(.rollout-card__edit.is-selected),
+.rollout-card:has(.rollout-card__edit:focus-visible) {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rollout-card { transition: none; }
+  .rollout-card:hover { transform: none; }
+}
+
+.rollout-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-50);
+  padding: var(--scale-300);
+}
+.rollout-card__customer {
+  font-size: var(--fontsize-body-md);
+  line-height: var(--line-height-body-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.rollout-card__name {
+  position: relative;
+  z-index: 1;              /* above the card-wide edit button */
+  align-self: flex-start;
+  color: var(--text-interactive);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+.rollout-card__name:hover { text-decoration: underline; }
+.rollout-card__size { color: var(--text-tertiary); }
+/* CSR and Sales, just above the status line. */
+.rollout-card__people { margin-top: var(--scale-200); }
+.rollout-card__status {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-100);
+  margin-top: var(--scale-200);
+  padding-top: var(--scale-200);
+  border-top: 1px solid var(--border-tertiary);
+}
+.rollout-card__date { font-weight: var(--font-weight-semibold); }
+.rollout-card__sub { color: var(--text-tertiary); }
+.rollout-card.is-late .rollout-card__sub,
+.rollout-card.is-due .rollout-card__sub { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+.rollout-card__note { color: var(--text-tertiary); font-size: var(--fontsize-label); }
+.rollout-card__note[hidden] { display: none; }
+
+/* The edit button is invisible and stretched over the card. */
+.rollout-card__edit {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.rollout-card__edit:focus-visible { outline: none; }
+
+.rollout-card__stripe {
+  flex: 0 0 var(--scale-200);
+  background: var(--card-status);
+}
+
 /* ══ Milestone flyout ═════════════════════════════════════════
    The shared flyout, narrower: three fields do not need the
    640px aside width.
@@ -596,3 +880,6 @@ td.is-selected .ms-cell {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* A completed rollout hidden by the Show completed switch. */
+.rollout-row[hidden] { display: none; }

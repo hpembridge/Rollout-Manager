@@ -197,6 +197,35 @@ body {
 }
 .overview-card__sub { color: var(--text-tertiary); }
 
+/* ── Overview header ───────────────────────────────────────────
+   Rollout name on the left, customer on the right, above the
+   timeline. Both are .detail-field (value at rest, a field on
+   hover / focus), just larger.
+   ------------------------------------------------------------- */
+.ov-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--scale-600);
+}
+.ov-header .detail-field { margin: 0; }
+/* Qualified by .ov-header to win over the base .detail-field size. */
+.ov-header .ov-header__name {
+  flex: 1 1 auto;
+  height: var(--scale-1000);
+  font-size: var(--fontsize-heading-h5);
+  line-height: var(--line-height-heading-h5);
+  font-weight: var(--font-weight-semibold);
+}
+.ov-header .ov-header__customer {
+  flex: 0 1 40%;
+  height: var(--scale-1000);
+  text-align: right;
+  font-size: var(--fontsize-body-lg);
+  color: var(--text-secondary);
+}
+
 /* ── Details ───────────────────────────────────────────────── */
 /* Details beside products: a fixed-width column on the left, the
    product table taking the rest. Stacks on narrow screens. */
@@ -267,6 +296,43 @@ body {
   outline: 2px solid var(--border-focus);
   outline-offset: -1px;
 }
+/* CSR / Sales: avatar, then the name (or the CSR picker). */
+.detail-person { display: flex; align-items: center; gap: var(--scale-200); }
+.detail-person .detail-field { margin-left: 0; }
+/* Sales text lines up with the CSR picker's text (the field's inner padding). */
+.detail-person > [data-ov="sales"] { padding-left: var(--scale-200); }
+
+/* ── Rollup ────────────────────────────────────────────────────
+   Totals for the whole rollout: a label over a large number, in
+   tinted tiles, under the people.
+   ------------------------------------------------------------- */
+.rollup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--scale-200);
+  margin: var(--scale-400) 0 0;
+  padding-top: var(--scale-400);
+  border-top: 1px solid var(--border-tertiary);
+}
+.rollup__tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--scale-50);
+  min-width: 0;
+  padding: var(--scale-300);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-subtle);
+}
+.rollup__label { color: var(--text-tertiary); font-size: var(--fontsize-label); }
+.rollup__value {
+  margin: 0;
+  font-size: var(--fontsize-heading-h6);
+  line-height: var(--line-height-heading-h6);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 /* Sales is read, not typed — it follows the customer. */
 .detail-list__value--derived { display: flex; align-items: center; min-height: var(--scale-800); }
 .detail-list__value .is-missing { color: var(--text-tertiary); font-weight: var(--font-weight-light); }
@@ -311,6 +377,10 @@ body {
   font-weight: var(--font-weight-semibold);
 }
 .overview .ov-timeline td.ov-timeline__cell { padding: var(--scale-100); }
+/* Key dates (On Property, Goes Live): a target only, no status. */
+.overview .ov-timeline .ov-timeline__milestone--key { color: var(--text-secondary); }
+.overview .ov-timeline td.ov-timeline__cell--na { background: var(--bg-subtle); }
+.overview .ov-timeline .ov-timeline__keydate { color: var(--text-tertiary); }
 .overview .ov-timeline .ov-timeline__status { color: var(--text-secondary); }
 .ov-timeline__status .status-dot { vertical-align: middle; margin-right: var(--scale-50); }
 /* Late and due are filled like the dashboard cells. Text stays

@@ -24,37 +24,54 @@
 (window.ROLLOUTS = window.ROLLOUTS || {})["fogo-0929"] = window.ROLLOUT_DATA = {
   "rollout": {
     "id": "fogo-0929",
-    "_milestonesNote": "SAMPLE dates for the dashboard demo, relative to 9/22/2026.",
+    "pressRun": "96 Versions",
+    "csr": "Peyton",
+    "sales": "Julia",
+    "_milestonesNote": "From the Rollouts Planning & Production Board sheet, 9/23/2026. Ticked milestones with no date on the sheet have made-up actual dates.",
     "milestones": {
       "filesReceived": {
-        "target": "2026-09-25"
+        "actual": "2026-09-11"
       },
       "tickets": {
-        "target": "2026-09-29"
+        "actual": "2026-09-14"
       },
       "initialProofOut": {
-        "target": "2026-10-02"
+        "actual": "2026-09-11"
       },
       "filesApproved": {
-        "target": "2026-10-09"
+        "actual": "2026-09-14"
       },
       "printed": {
-        "target": "2026-10-19"
+        "done": true,
+        "actual": "2026-09-15"
       },
       "cut": {
-        "target": "2026-10-21"
+        "done": true,
+        "actual": "2026-09-17"
       },
       "finishing": {
-        "target": "2026-10-23"
+        "done": true,
+        "actual": "2026-09-21"
       },
       "shipDate": {
-        "target": "2026-10-27"
+        "done": true,
+        "actual": "2026-09-21"
+      },
+      "onProperty": {
+        "target": "2026-09-23"
+      },
+      "goesLive": {
+        "target": "2026-09-28"
       },
       "billingPrep": {
-        "target": "2026-10-30"
+        "actual": "2026-09-21"
+      },
+      "inBilling": {
+        "actual": "2026-09-21"
       },
       "billingCompleted": {
-        "target": "2026-11-06"
+        "done": true,
+        "actual": "2026-09-23"
       }
     },
     "customer": "(21491) Fogo De Chao Corporate",
