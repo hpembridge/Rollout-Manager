@@ -895,6 +895,16 @@ td.inherited .val { color: var(--text-tertiary); }
 td.na { background: var(--bg-muted); }
 td.na .val { color: var(--text-tertiary); font-style: italic; }
 td.derived .val { font-weight: var(--font-weight-semibold); color: var(--text-primary); }
+/* Quantity Shipping: bold total, then the per-version split. */
+.qty-split { gap: var(--scale-100); }
+.qty-split__total { flex: none; }
+.qty-split__parts {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-light);
+}
 
 /* ── Selection ─────────────────────────────────────────────────
    Tint on every cell in the range, a 2px edge on the four outer

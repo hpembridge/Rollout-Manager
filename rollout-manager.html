@@ -30,6 +30,8 @@
     </script>
     <!-- Customer / CSR / people lookups for the Overview. -->
     <script src="rollout-customers.js"></script>
+    <!-- Job directory: what a new master ticket's job number is checked against. -->
+    <script src="rollout-jobs.js"></script>
     <!-- Milestone status rules, shared with the dashboard. -->
     <script src="rollout-status.js"></script>
     <script>
@@ -356,6 +358,17 @@
           <button class="icon-btn tier-edit" type="button" aria-label="Edit versions" title="Edit versions">
             <i class="fa-regular fa-pen" aria-hidden="true"></i>
           </button>
+        </span>
+      </template>
+      <!-- ══ Quantity Shipping cell ═════════════════════════════
+           The ticket's total (from Distribution), then its total per
+           version, muted: "3,810 (600 T1 + 3,210 T2)". Filled in
+           buildTable(); in Angular, the total plus an @for over versions.
+           ───────────────────────────────────────────────────── -->
+      <template id="qtySplitTemplate">
+        <span class="val qty-split">
+          <span class="qty-split__total"></span>
+          <span class="qty-split__parts"></span>
         </span>
       </template>
       <!-- ══ Row delete ═══════════════════════════════════════
@@ -790,6 +803,18 @@ function versionTotal(vId){
   }, 0);
 }
 
+/* What a master ticket ships per version: "(600 T1 + 3,210 T2)", plus
+   "200 no version" while some locations have none. Empty for a ticket
+   with no versions. Shown beside the total in Quantity Shipping. */
+function versionSplit(vId){
+  if(!hasTiers(vId)) return "";
+  const sum = list => list.reduce((n,a)=>{ const q=parseFloat(String(getQty(vId, a.id)).replace(/[^0-9.\-]/g,"")); return n+(isNaN(q)?0:q); }, 0);
+  const parts = tiersOf(vId).map(t=>`${sum(addressesOnTier(vId, t.id)).toLocaleString()} ${t.name}`);
+  const none = untiered(vId);
+  if(none.length) parts.push(`${sum(none).toLocaleString()} no version`);
+  return `(${parts.join(" + ")})`;
+}
+
 /* ── Tiers ─────────────────────────────────────────────────────
    A tier is a content variant of a master ticket: T1 and T2 of the
    Main Menu Card share every spec and differ only in what is printed
@@ -818,13 +843,10 @@ const findTierByName = (vId, name) => {
   const n=String(name??"").trim().toLowerCase();
   return tiersOf(vId).find(t=>t.name.toLowerCase()===n) || null;
 };
-/* What a spun-off ticket is called: master, tier (if any), address —
-   "Main Menu Card - T1 - Boston", "Dessert Menu Card - Boston". */
-const ticketName = (vId,aId) => {
-  const t = tierName(vId,aId), a = ADDR(aId).name;
-  /* An each-location version named for its location would repeat it. */
-  return [VER(vId).desc || VER(vId).job, t.toLowerCase()===a.toLowerCase() ? "" : t, a].filter(Boolean).join(" - ");
-};
+/* What a production ticket is called: master, then version if any —
+   "Main Menu Card - T1", "Dessert Menu Card". One per version. */
+const ticketName = (vId, tier) =>
+  [VER(vId).desc || VER(vId).job, tier ? tier.name : ""].filter(Boolean).join(" - ");
 
 /* ── Shipping exceptions ───────────────────────────────────────
    See state.shipExc. An exception is listed only while the address
@@ -910,7 +932,7 @@ function masterTable(){
        it is what the rest of the row is read against. */
     cols: JOBFIELDS.filter(f=>f.id==="desc").map(f=>({key:f.id, kind:"jobfield", label:f.name,
                      w:f.w||230, pinned:true}))
-           .concat([{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", num:true, w:160, pinned:true},
+           .concat([{key:"__qtytotal", kind:"derived", label:"Quantity Shipping", w:300, pinned:true},
            /* Tiers are the ticket's own, so they sit with the ticket
               rather than on a table of their own. Pinned beside the
               quantity: they are how that quantity splits. */
@@ -921,9 +943,10 @@ function masterTable(){
     cellAt(rk, ck){
       if(rk==="__add"||ck==="__addfield") return {kind:"blank"};
       if(ck==="__qtytotal"){
+        /* The ticket's total, then its total per version. */
         const total = versionTotal(rk);
         return {kind:"data", value:String(total), display:total.toLocaleString(),
-                num:true, editable:false, derived:true};
+                editable:false, derived:true, split:versionSplit(rk)};
       }
       if(ck==="__tiers"){
         const names = tiersOf(rk).map(t=>t.name).join(", ");
@@ -1395,7 +1418,6 @@ function buildTable(T,t){
     if(c.movable) wireColumnDrag(th, T, c);
     else if(!th.title) th.title = c.label + " — fixed column";
     if(c.kind==="spec")     th.oncontextmenu=e=>{e.preventDefault(); specMenu(e, c.key);};
-    if(c.kind==="field")    th.oncontextmenu=e=>{e.preventDefault(); fieldMenu(e, c.key);};
     if(c.kind==="jobfield") th.oncontextmenu=e=>{e.preventDefault(); jobFieldMenu(e, c.key);};
     if(c.version)           th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e, c.version);};
     return th;
@@ -1434,7 +1456,10 @@ function buildTable(T,t){
     const th=document.createElement("th");
     if(R.kind==="addrow"){
       th.className="add"; th.innerHTML=`<span class="cellpad">${esc(R.label)}</span>`;
-      th.onclick=()=> T.kind==="master" ? addVersion() : newAddress();
+      th.onclick=()=>{
+        if(th.querySelector(".editor")) return;
+        T.kind==="master" ? addVersion(th) : newAddress(th);
+      };
     } else {
       th.className="hd" + (s&&s.t===t&&ri>=s.r0&&ri<=s.r1 ? " hd-sel":"");
       th.dataset.row=R.key;
@@ -1484,6 +1509,14 @@ function buildTable(T,t){
          type into it, so it has no editor. The tiers cell is chips from
          its template. */
       if(cell.tiers){ td.dataset.tiers=cell.version; td.appendChild(tierCell(cell.version)); }
+      else if(cell.derived){
+        /* Quantity Shipping: total, then the per-version split. */
+        const v=document.getElementById("qtySplitTemplate").content.firstElementChild.cloneNode(true);
+        v.querySelector(".qty-split__total").textContent = cell.display;
+        v.querySelector(".qty-split__parts").textContent = cell.split || "";
+        v.title = cell.split ? `${cell.display} ${cell.split}` : cell.display;
+        td.appendChild(v);
+      }
       else td.innerHTML = cell.bool
         ? `<span class="val"><input type="checkbox" class="cell-check"${cell.checked?" checked":""} aria-label="${esc(C.label)}"></span>`
         : `<span class="val">${esc(cell.display||"")}</span>`;
@@ -2169,58 +2202,83 @@ function addShipField(id){
   commit();
   toast(`${c.name} added to delivery.`, "Undo", undo);
 }
-function fieldMenu(e, fId){
-  const f=FIELD[fId];
-  const filled = Object.keys(state.addrValues).filter(k=>k.endsWith("::"+fId)).length;
-  menu(e.clientX,e.clientY,
-    `<div class="mlabel">${esc(f.name)}</div>
-     <button class="danger" data-a="del">Remove field</button>
-     <div class="mnote">${filled
-       ? `${filled} address value${filled===1?"":"s"} go with it.`
-       : `Nothing has been entered in it yet.`}</div>`,
-    m=>{ m.querySelector('[data-a="del"]').onclick=()=>{closeMenu(); deleteField(fId);}; });
-}
-function deleteField(fId){
-  if(FIELDS.length<=1){ toast("A rollout needs at least one field."); return; }
-  begin();
-  const nm=FIELD[fId].name;
-  FIELDS=FIELDS.filter(f=>f.id!==fId); reindexFields();
-  Object.keys(state.addrValues).forEach(k=>{ if(k.endsWith("::"+fId)) delete state.addrValues[k]; });
-  Object.values(state.shipExc).forEach(o=>{ delete o[fId]; });
-  sel=null; commit();
-  toast(`${nm} removed from delivery.`, "Undo", undo);
-}
-
 /* ============================ STRUCTURAL OPS ============================ */
-function addVersion(){
-  begin();
-  const id=nextId("v", state.versions);
-  const base=state.versions[state.versions.length-1];
-  /* The new ticket takes the shape of the last one — the same details,
-     so it lands on the same detail tables — but none of its values. */
-  state.versions.push({id, job:nextJob(), desc:"", fields:{}, tiers:[],
-    details: base ? base.details.map(d=>({name:d.name, specs:{}})) : [{name:"Inserts", specs:{}}]});
-  commit();
-  state.view="master"; render();
-  const ri=state.versions.length-1;
-  const th=document.querySelectorAll('[data-table="master"] tbody th.hd')[ri];
-  if(th) inlineRename(th, state.versions[ri].job, v=>{ begin(); state.versions[ri].job=v||state.versions[ri].job; commit(); });
-  toast("Master ticket added. Set its job number, then enter quantities on the distribution.", "Undo", undo);
+/* ── Adding master tickets ─────────────────────────────────────
+   A new master ticket is added by its job number, typed into the
+   "+ Add Master Ticket" row. The number must be six digits, exist in
+   the job directory (rollout-jobs.js), belong to this rollout's
+   customer, and not already be in the rollout (as a master ticket or
+   a version's own job). Job numbers are not renamed afterwards.
+   ------------------------------------------------------------- */
+const jobsInRollout = () => new Set(state.versions.flatMap(v=>[v.job, ...tiersOf(v.id).map(t=>t.job)]).filter(Boolean));
+function jobError(job){
+  if(!/^\d{6}$/.test(job)) return "Job numbers are 6 digits.";
+  if(jobsInRollout().has(job)) return `Job ${job} is already in this rollout.`;
+  const found=(window.ROLLOUT_JOBS||[]).find(j=>j.job===job);
+  if(!found) return `No job ${job} found.`;
+  if(found.customer!==state.rollout.customer)
+    return `Job ${job} belongs to ${found.customer}, not ${state.rollout.customer || "this rollout's customer"}.`;
+  return "";
 }
-function duplicateVersion(vId){
-  begin();
-  const src=VER(vId), id=nextId("v", state.versions);
-  state.versions.push({id, job:nextJob(), desc:src.desc, fields:{...(src.fields||{})},
-    tiers: JSON.parse(JSON.stringify(src.tiers||[])),
-    details: JSON.parse(JSON.stringify(src.details))});
-  /* Tier ids are local to a ticket, so the copy's tiers keep the same
-     ids and each address keeps its tier. */
-  state.addresses.forEach(a=>{
-    if(receives(vId, a.id)) setQty(id, a.id, getQty(vId, a.id));
-    if(getTier(vId, a.id)) setTier(id, a.id, getTier(vId, a.id));
+const jobDesc = job => ((window.ROLLOUT_JOBS||[]).find(j=>j.job===job) || {}).desc || "";
+
+/* An entry typed into an add row: an .editor input over the "+ Add …"
+   header. Enter checks it with validate() (an error message, or "");
+   a valid value goes to create(). Esc or leaving the field cancels. */
+function addRowEntry(th, placeholder, validate, create){
+  const inp=document.createElement("input");
+  inp.className="editor"; inp.placeholder=placeholder;
+  th.appendChild(inp); inp.focus();
+  let done=false;
+  const cancel=()=>{ if(done) return; done=true; inp.remove(); render(); };
+  inp.oninput=()=>inp.classList.remove("editor--invalid");
+  inp.onblur=cancel;
+  inp.onkeydown=ev=>{ ev.stopPropagation();
+    if(ev.key==="Escape"){ ev.preventDefault(); cancel(); }
+    if(ev.key==="Enter"){ ev.preventDefault();
+      const val=inp.value.trim(), err=validate(val);
+      if(err){ inp.classList.add("editor--invalid"); toast(err); return; }
+      done=true; inp.remove(); create(val);
+    }
+  };
+}
+const addRowHeader = kind => document.querySelector(`[data-table="${kind}"] tbody th.add`);
+
+function addVersion(th){
+  th = th || addRowHeader("master");
+  if(!th) return;
+  addRowEntry(th, "Job number", jobError, job=>{
+    begin();
+    const id=nextId("v", state.versions);
+    const base=state.versions[state.versions.length-1];
+    /* The new ticket takes the shape of the last one — the same details,
+       so it lands on the same detail tables — but none of its values. */
+    state.versions.push({id, job, desc:jobDesc(job), fields:{}, tiers:[],
+      details: base ? base.details.map(d=>({name:d.name, specs:{}})) : [{name:"Inserts", specs:{}}]});
+    commit();
+    toast(`Job ${job} added. Enter its quantities on Distribution.`, "Undo", undo);
   });
-  commit();
-  toast("Master ticket duplicated with its details, versions and quantities.", "Undo", undo);
+}
+/* Duplicate asks for the copy's job number the same way. */
+function duplicateVersion(vId){
+  state.view="master"; sel=null; render();
+  const th=addRowHeader("master"); if(!th) return;
+  toast(`Enter the job number for the copy of ${VER(vId).desc || VER(vId).job}.`);
+  addRowEntry(th, "Job number for the copy", jobError, job=>{
+    begin();
+    const src=VER(vId), id=nextId("v", state.versions);
+    state.versions.push({id, job, desc:src.desc, fields:{...(src.fields||{})},
+      tiers: JSON.parse(JSON.stringify(src.tiers||[])),
+      details: JSON.parse(JSON.stringify(src.details))});
+    /* Tier ids are local to a ticket, so the copy's tiers keep the same
+       ids and each address keeps its tier. */
+    state.addresses.forEach(a=>{
+      if(receives(vId, a.id)) setQty(id, a.id, getQty(vId, a.id));
+      if(getTier(vId, a.id)) setTier(id, a.id, getTier(vId, a.id));
+    });
+    commit();
+    toast(`Job ${job} added as a copy, with its details, versions and quantities.`, "Undo", undo);
+  });
 }
 function deleteVersion(vId){
   if(state.versions.length<=1){ toast("A rollout needs at least one master ticket."); return; }
@@ -2242,15 +2300,22 @@ function removeAddress(aId){
   sel=null; commit();
   toast("Address removed from the rollout.", "Undo", undo);
 }
-function newAddress(){
-  begin();
-  const id=nextId("a", state.addresses);
-  state.addresses.push({id, name:"New address", city:"—"});
-  commit();
-  /* Exception rows sit between addresses, so find the new row by key. */
-  const ri = TM(0) ? TM(0).rows.findIndex(r=>r.key===id) : -1;
-  if(ri>=0) setSel(0, ri, 0, false);
-  toast("Address added. Name it, then enter its quantities on the distribution.", "Undo", undo);
+/* A location is added by name, typed into the "+ New address" row.
+   Names are unique in the rollout and are not renamed afterwards. */
+function newAddress(th){
+  const kind = state.view==="ship" ? "ship" : "dist";
+  th = th || addRowHeader(kind);
+  if(!th) return;
+  const taken = name => state.addresses.some(a=>a.name.trim().toLowerCase()===name.toLowerCase());
+  addRowEntry(th, "Location name",
+    name => !name ? "Give the location a name." : taken(name) ? `There's already a location called ${name}.` : "",
+    name=>{
+      begin();
+      const id=nextId("a", state.addresses);
+      state.addresses.push({id, name, city:""});
+      commit();
+      toast(`${name} added. Enter its quantities on Distribution.`, "Undo", undo);
+    });
 }
 
 /* ── Tier ops ──────────────────────────────────────────────────
@@ -2572,23 +2637,23 @@ document.getElementById("tabDist").onclick =()=>{ state.view="dist";   sel=null;
    reports what it would act on, so the shape of the output can be
    argued about before anyone writes it. */
 document.getElementById("shipTracker").onclick=()=>{
-  const lines=state.versions.reduce((n,v)=>n+addressesOn(v.id).length, 0);
-  toast(`Ship tracker for ${lines.toLocaleString()} shipment${lines===1?"":"s"} across ${state.addresses.length} address${state.addresses.length===1?"":"es"}.`);
+  /* One ship tracker for the customer, loaded with every production ticket. */
+  const n=productionCount();
+  toast(`Ship tracker for ${state.rollout.customer || "this customer"}: ${plural(n, "production ticket")} across ${plural(state.addresses.length, "location")}.`);
 };
 document.getElementById("createTickets").onclick=()=>{
-  /* A tiered ticket with an address on no tier cannot be spun off —
-     nobody has said which version that address gets. */
+  /* A location on a multi-version ticket with no version cannot be
+     produced — nobody has said which version it gets. */
   const missing=state.versions.reduce((n,v)=>n+untiered(v.id).length, 0);
   if(missing){
-    toast(`${missing} address${missing===1?" needs":"es need"} a version first.`, "Open distribution", ()=>{
+    toast(`${missing} location${missing===1?" needs":"s need"} a version first.`, "Open distribution", ()=>{
       state.view="dist"; sel=null; render();
     });
     return;
   }
-  const lines=state.versions.reduce((n,v)=>n+addressesOn(v.id).length, 0);
-  const v=state.versions.find(x=>addressesOn(x.id).length);
-  const eg=v ? ` Named like "${ticketName(v.id, addressesOn(v.id)[0].id)}".` : "";
-  toast(`${lines.toLocaleString()} ticket${lines===1?"":"s"} created from ${state.versions.length} master ticket${state.versions.length===1?"":"s"}.${eg}`);
+  /* One production ticket per version; one for a ticket with none. */
+  const n=productionCount();
+  toast(`${plural(n, "production ticket")} created from ${plural(state.versions.length, "master ticket")}.`);
 };
 
 render();
@@ -2823,10 +2888,21 @@ render();
          Famous Dave's runs every version as its own job — shown in the
          chip's tooltip.
 
-         Spun-off tickets are named ticketName(): master, version, address —
-         "Main Menu Card - T1 - Boston", "Dessert Menu Card - Boston" —
-         matching how the client ticket list names them. Create Tickets
-         refuses while any address needs a version.
+         Production tickets are one per version (one for a master ticket
+         with none), named ticketName(): master, then version — "Main Menu
+         Card - T1", "Dessert Menu Card". Create Tickets refuses while any
+         location needs a version. Create Ship Tracker loads every
+         production ticket into one ship tracker for the customer.
+
+         Adding, not renaming. A master ticket is added by typing its job
+         number into the "+ Add Master Ticket" row (Duplicate asks for the
+         copy's number the same way): it must be six digits, exist in the
+         job directory (rollout-jobs.js, prototype only — in Angular a JM
+         job lookup), belong to the rollout's customer, and not already be
+         in the rollout. A location is added by typing its name into
+         "+ New address"; names are unique. Neither is renamed afterwards —
+         addRowEntry() is the one input for both. The Delivery fields are
+         fixed: no adding, removing or reordering.
 
          Simulated in JS, becomes Angular state/events
            - All data is the in-memory `state` object; no persistence layer.
