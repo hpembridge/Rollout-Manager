@@ -51,22 +51,6 @@
       <!-- ══ Topbar ═══════════════════════════════════════════ -->
       <header class="dash-topbar">
         <h1 class="dash-title">Rollouts <span class="dash-title__count" id="rolloutCount"></span></h1>
-        <div class="dash-topbar__actions">
-        <!-- View switch: the milestone table, the three-week Gantt, or
-             the board.
-             aria-pressed marks the current one. -->
-        <div class="view-toggle" role="group" aria-label="View">
-          <button class="view-toggle__btn is-active" type="button" data-view="table" aria-pressed="true">
-            <i class="fa-regular fa-table" aria-hidden="true"></i> Table
-          </button>
-          <button class="view-toggle__btn" type="button" data-view="gantt" aria-pressed="false">
-            <i class="fa-regular fa-chart-gantt" aria-hidden="true"></i> Gantt
-          </button>
-          <button class="view-toggle__btn" type="button" data-view="board" aria-pressed="false">
-            <i class="fa-regular fa-square-kanban" aria-hidden="true"></i> Board
-          </button>
-        </div>
-        </div>
       </header>
       <!-- ══ /Topbar ══════════════════════════════════════════ -->
 
@@ -84,10 +68,8 @@
             <li class="status-legend__item"><span class="status-dot status-dot--upcoming"></span> Upcoming</li>
           </ul>
           <div class="status-legend__end">
-            <p class="status-legend__hint" data-hint="gantt" hidden>Each dot sits on the actual date when done, otherwise the target. Click one to edit.</p>
-            <p class="status-legend__hint" data-hint="board" hidden>Each rollout sits under its next open milestone. Click a card to update it.</p>
             <!-- Show completed: a rollout is completed once Billing Done has
-                 an actual date. Off by default, so they drop out of every view. -->
+                 an actual date. Off by default, so they drop out of the list. -->
             <label class="switch">
               <input type="checkbox" id="showCompleted" />
               <span class="switch-track" aria-hidden="true"></span>
@@ -104,8 +86,7 @@
              timeline; here a dot's date shows on hover.
 
              The li[data-milestone] names in header row 2 are the one
-             list of milestones — the tracks, Gantt and Board lanes are
-             built from them.
+             list of milestones — the tracks are built from them.
              ─────────────────────────────────────────────────── -->
         <div class="rollout-scroller">
           <table class="rollout-list">
@@ -171,55 +152,6 @@
         </div>
         <!-- ══ /Rollout list ══════════════════════════════════ -->
 
-        <!-- ══ Gantt ══════════════════════════════════════════
-             Last week, this week and next week, Monday to Sunday — 21
-             day columns. One row per rollout — milestones run in sequence,
-             so they share a single track. Each department's bar runs from
-             its first to its last milestone date; each milestone is a dot
-             on its date (actual if done, else target) that opens the
-             flyout. Milestones outside the window are counted at the edge.
-
-             One CSS grid: a label column and 21 day columns (.gantt).
-             The header cells and rollout rows are cloned from the gantt*
-             templates by renderGantt(); the day grid lives in CSS.
-             ─────────────────────────────────────────────────── -->
-        <div class="gantt-scroller" id="ganttView" hidden>
-          <div class="gantt" id="gantt">
-            <!-- Row 1: week labels -->
-            <div class="gantt__corner" aria-hidden="true"></div>
-            <!-- ganttWeekTemplate × 3 -->
-            <!-- Row 2: day labels -->
-            <!-- ganttDayTemplate × 21 -->
-            <!-- Then one ganttRolloutTemplate per rollout -->
-          </div>
-        </div>
-        <!-- ══ /Gantt ═════════════════════════════════════════ -->
-
-        <!-- ══ Board ══════════════════════════════════════════
-             Kanban, after the PL-JOBS-DASHBOARDS boards. One lane per
-             milestone, in order; Billing Done is the last. A rollout
-             sits in the lane of its next open milestone — the first one
-             not done — and moves right as actuals are entered; one with
-             everything done sits in Billing Done. Lanes are colour-coded
-             by department along the top edge (data-group), and the board
-             drags sideways like the jobs boards.
-             Empty lanes collapse to a rail (click to open; "Expand N
-             empty" opens them all). The card's stripe is that milestone's
-             status. Clicking a card opens the flyout for that milestone.
-
-             Lanes come from the same milestone list as the table;
-             renderBoard() clones boardLaneTemplate / rolloutCardTemplate.
-             ─────────────────────────────────────────────────── -->
-        <div class="board" id="boardView" hidden>
-          <div class="board__toolbar">
-            <button class="text-btn" type="button" id="boardToggleEmpty"></button>
-          </div>
-          <div class="kanban" id="kanban">
-            <!-- boardLaneTemplate × milestones -->
-          </div>
-        </div>
-        <!-- ══ /Board ═════════════════════════════════════════ -->
-
       </main>
     </div>
 
@@ -278,92 +210,6 @@
 
 
 
-    <!-- ── Board templates ───────────────────────────────────
-         A lane: header (milestone, its department, count) and the card
-         list. is-collapsed turns an empty lane into a rail. -->
-    <template id="boardLaneTemplate">
-      <section class="lane">
-        <button class="lane-header" type="button" aria-expanded="true">
-          <span class="lane-title"></span>
-          <span class="lane-dept"></span>
-          <span class="lane-count"></span>
-        </button>
-        <div class="lane-cards">
-          <!-- rolloutCardTemplate cards, or the empty note -->
-          <p class="lane-empty" hidden>No rollouts here</p>
-        </div>
-      </section>
-    </template>
-
-    <!-- A rollout on the board. The edit button covers the card (its
-         ::after), so the whole card opens the flyout; the rollout name
-         is a real link sitting above it. The stripe is the status of the
-         milestone the card is waiting on. -->
-    <template id="rolloutCardTemplate">
-      <article class="rollout-card">
-        <div class="rollout-card__body">
-          <span class="rollout-card__customer"></span>
-          <a class="rollout-card__name" href="#"></a>
-          <span class="rollout-card__size"></span>
-          <!-- CSR, then Sales (components/avatar). -->
-          <span class="avatar-group rollout-card__people">
-            <span class="avatar" data-role="csr"></span>
-            <span class="avatar" data-role="sales"></span>
-          </span>
-          <span class="rollout-card__status">
-            <span class="status-dot"></span>
-            <span class="rollout-card__date"></span>
-            <span class="rollout-card__sub"></span>
-            <i class="fa-regular fa-comment rollout-card__note" aria-hidden="true" hidden></i>
-          </span>
-          <button class="rollout-card__edit" type="button"></button>
-        </div>
-        <span class="rollout-card__stripe" aria-hidden="true"></span>
-      </article>
-    </template>
-
-    <!-- ── Gantt templates ─────────────────────────────────── -->
-    <template id="ganttWeekTemplate">
-      <div class="gantt__week">
-        <span class="gantt__week-name"></span>
-        <span class="gantt__week-range"></span>
-      </div>
-    </template>
-
-    <template id="ganttDayTemplate">
-      <div class="gantt__day">
-        <span class="gantt__day-name"></span>
-        <span class="gantt__day-num"></span>
-      </div>
-    </template>
-
-    <!-- One rollout: customer and rollout in the label column, then one
-         track holding every milestone — they run in sequence, so one
-         line is enough. A bar per department sits under the dots; the
-         off-window counts sit at the track's edges. -->
-    <template id="ganttRolloutTemplate">
-      <div class="gantt__rollout">
-        <span class="gantt__rollout-customer"></span>
-        <a class="gantt__rollout-name" href="#"></a>
-      </div>
-      <div class="gantt__track">
-        <!-- ganttBarTemplate × departments, then ganttMarkerTemplate × milestones -->
-        <span class="gantt__more gantt__more--before" hidden></span>
-        <span class="gantt__more gantt__more--after" hidden></span>
-      </div>
-    </template>
-
-    <!-- A department's span on the track, first to last milestone. -->
-    <template id="ganttBarTemplate">
-      <span class="gantt__bar"></span>
-    </template>
-
-    <template id="ganttMarkerTemplate">
-      <button class="gantt__marker" type="button">
-        <span class="status-dot"></span>
-        <span class="gantt__marker-label"></span>
-      </button>
-    </template>
     <!-- ══ /Templates ═════════════════════════════════════════ -->
 
     <!-- ══ Milestone flyout ═══════════════════════════════════
@@ -502,8 +348,6 @@
       if (data.versions) el.href = "rollout-manager.html?rollout=" + encodeURIComponent(r.id || "");
       else { el.removeAttribute("href"); el.classList.add("is-static"); }
     }
-    /* Products line: counts, the same for full and summary rollouts. */
-    const sizeText = s => `${plural(s.products.length, "product")} · ${plural(s.locations, "location")} · ${fmt(s.total)}`;
     /* CSR and Sales avatars: initials from the people directory
        (rollout-customers.js), data color from data-color, full name +
        role in the tooltip. No one
@@ -559,7 +403,7 @@
 
     /* ── Completed filter ────────────────────────────────────────
        A rollout is completed once Billing Done has an actual date.
-       Completed rollouts are hidden from all three views unless
+       Completed rollouts are hidden from the list unless
        "Show completed" is on. Re-applied after every flyout save,
        since entering that date completes the rollout.
        ------------------------------------------------------------ */
@@ -576,9 +420,7 @@
       });
       document.getElementById("rolloutCount").textContent = shown;
     }
-    showCompletedBox.addEventListener("change", () => {
-      applyCompletedFilter(); renderGantt(); renderBoard();
-    });
+    showCompletedBox.addEventListener("change", applyCompletedFilter);
     applyCompletedFilter();
 
     /* A department's track: each milestone's dot gets its status
@@ -605,272 +447,6 @@
 
 
 
-    /* ── Gantt ───────────────────────────────────────────────────
-       Window: Monday of last week to Sunday of next week. Grid column
-       1 is the label; day d (0–20) is column d + 2.
-       ------------------------------------------------------------ */
-    const DAYS = 21;
-    const WEEK_START = (() => {
-      const d = new Date(TODAY);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);   // Monday, last week
-      return d;
-    })();
-    const dayIndex = iso => { const d = RolloutStatus.parseISO(iso); return d ? Math.round((d - WEEK_START) / 864e5) : null; };
-    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    const addDays = n => { const d = new Date(WEEK_START); d.setDate(d.getDate() + n); return d; };
-    const GROUP_KEYS = [...new Set(MILESTONES.map(ms => ms.group))];
-    const gantt = document.getElementById("gantt");
-
-    /* The two header rows never change, so they are built once. */
-    (function ganttHeader(){
-      ["Last week", "This week", "Next week"].forEach((name, w) => {
-        const el = tpl("ganttWeekTemplate").firstElementChild.cloneNode(true);
-        const a = addDays(w * 7), b = addDays(w * 7 + 6);
-        set(el, ".gantt__week-name", name);
-        set(el, ".gantt__week-range",
-          `${MONTHS[a.getMonth()]} ${a.getDate()} – ${a.getMonth() === b.getMonth() ? "" : MONTHS[b.getMonth()] + " "}${b.getDate()}`);
-        el.style.gridColumn = `${w * 7 + 2} / span 7`;   // row 1 is set in CSS
-        gantt.appendChild(el);
-      });
-      const corner = document.createElement("div");
-      corner.className = "gantt__corner gantt__corner--days";
-      gantt.appendChild(corner);
-      for (let d = 0; d < DAYS; d++){
-        const el = tpl("ganttDayTemplate").firstElementChild.cloneNode(true);
-        const date = addDays(d);
-        set(el, ".gantt__day-name", DAY_NAMES[d % 7]);
-        set(el, ".gantt__day-num", date.getDate());
-        if (d % 7 === 0) el.classList.add("is-week-start");
-        if (d % 7 >= 5) el.classList.add("is-weekend");
-        if (RolloutStatus.daysBetween(date, TODAY) === 0) el.classList.add("is-today");
-        el.style.gridColumn = String(d + 2);   // row 2 is set in CSS
-        gantt.appendChild(el);
-      }
-    })();
-
-    /* Rollout rows are rebuilt whenever a date changes. Every body
-       item gets an explicit grid row, so the weekend / today column
-       shades can span them all without disturbing placement. */
-    function renderGantt(){
-      gantt.querySelectorAll("[data-gantt-body]").forEach(el => el.remove());
-      let row = 3;   // rows 1–2 are the header
-      const place = el => { el.dataset.ganttBody = ""; el.style.gridRow = String(row); };
-      ROLLOUTS.forEach(data => {
-        const r = data.rollout || {};
-        if (!isVisible(r)) return;
-        const head = tpl("ganttRolloutTemplate").cloneNode(true);
-        nameLink(head.querySelector(".gantt__rollout-name"), data, r);
-        set(head, ".gantt__rollout-customer", r.customer || "—");
-        const [label, track] = head.children;
-        place(label); place(track);
-
-        const items = MILESTONES.map(ms => {
-          const m = milestones[r.id][ms.key] || {};
-          const st = RolloutStatus.milestoneStatus(m);
-          return { ms, m, st, day: dayIndex(st.date) };
-        }).filter(x => x.day !== null);
-
-        /* One bar per department, spanning its dated milestones and
-           clipped to the window. */
-        GROUP_KEYS.forEach(g => {
-          const mine = items.filter(x => x.ms.group === g);
-          if (!mine.length) return;
-          const first = Math.min(...mine.map(x => x.day)), last = Math.max(...mine.map(x => x.day));
-          const a = Math.max(first, 0), b = Math.min(last, DAYS - 1);
-          if (a > b) return;
-          const bar = tpl("ganttBarTemplate").firstElementChild.cloneNode(true);
-          bar.style.gridColumn = `${a + 1} / ${b + 2}`;
-          bar.title = GROUP_NAMES[g];
-          bar.classList.toggle("is-cut-start", first < 0);
-          bar.classList.toggle("is-cut-end", last > DAYS - 1);
-          track.appendChild(bar);
-        });
-
-        const before = items.filter(x => x.day < 0).length;
-        const after = items.filter(x => x.day > DAYS - 1).length;
-        const moreB = track.querySelector(".gantt__more--before");
-        const moreA = track.querySelector(".gantt__more--after");
-        moreB.hidden = !before; moreB.textContent = `◂ ${before} earlier`;
-        moreA.hidden = !after;  moreA.textContent = `${after} later ▸`;
-
-        items.filter(x => x.day >= 0 && x.day < DAYS).forEach(x => {
-          const btn = tpl("ganttMarkerTemplate").firstElementChild.cloneNode(true);
-          btn.dataset.marker = `${r.id}:${x.ms.key}`;
-          btn.dataset.refocus = `.gantt__marker[data-marker="${r.id}:${x.ms.key}"]`;
-          btn.style.gridColumn = String(x.day + 1);
-          btn.classList.add("is-" + x.st.state);
-          btn.querySelector(".status-dot").className = "status-dot status-dot--" + x.st.state;
-          set(btn, ".gantt__marker-label", x.ms.label);
-          btn.title = `${x.ms.label} · ${GROUP_NAMES[x.ms.group]} · ${RolloutStatus.shortDate(x.st.date)} · ${x.st.sub}${x.m.note ? "\n" + x.m.note : ""}`;
-          btn.setAttribute("aria-label", `${x.ms.label}, ${r.name}: ${RolloutStatus.shortDate(x.st.date)}, ${x.st.sub}. Edit.`);
-          btn.addEventListener("click", () => openFlyout(r, x.ms, btn));
-          track.appendChild(btn);
-        });
-        gantt.appendChild(head);
-        row++;
-      });
-
-      /* Weekend and today shading, one full-height strip per column. */
-      for (let d = 0; d < DAYS; d++){
-        const today = RolloutStatus.daysBetween(addDays(d), TODAY) === 0;
-        if (d % 7 < 5 && !today) continue;
-        const shade = document.createElement("div");
-        shade.className = "gantt__shade " + (today ? "gantt__shade--today" : "gantt__shade--weekend");
-        shade.dataset.ganttBody = "";
-        shade.style.gridColumn = String(d + 2);
-        shade.style.gridRow = `3 / ${row}`;
-        gantt.prepend(shade);
-      }
-    }
-    renderGantt();
-
-    /* ── Board ───────────────────────────────────────────────────
-       Lanes: every milestone in order; Billing Done is the last. A
-       rollout's lane is its first milestone that is not done; one with
-       everything done sits in Billing Done as complete. Each lane
-       carries its department (data-group) for the lane colour.
-       ------------------------------------------------------------ */
-    const kanban = document.getElementById("kanban");
-    const LANES = MILESTONES.map(ms => ({ key: ms.key, title: ms.label, dept: GROUP_NAMES[ms.group], group: ms.group, ms }));
-    const LAST_LANE = LANES[LANES.length - 1].key;
-    const openLanes = new Set();     // empty lanes the user opened
-    let allEmptyOpen = false;
-
-    const isDone = m => !!(m && (m.actual || m.done));
-    const currentMilestone = r =>
-      MILESTONES.find(ms => !isDone(milestones[r.id][ms.key])) || null;
-
-    function renderBoard(){
-      kanban.replaceChildren();
-      const byLane = Object.fromEntries(LANES.map(l => [l.key, []]));
-      ROLLOUTS.forEach(data => {
-        const r = data.rollout || {};
-        if (!isVisible(r)) return;
-        const ms = currentMilestone(r);
-        byLane[ms ? ms.key : LAST_LANE].push({ data, r, ms });
-      });
-
-      LANES.forEach(lane => {
-        const el = tpl("boardLaneTemplate").firstElementChild.cloneNode(true);
-        const items = byLane[lane.key];
-        const collapsed = !items.length && !allEmptyOpen && !openLanes.has(lane.key);
-        el.dataset.lane = lane.key;
-        el.classList.toggle("is-collapsed", collapsed);
-        el.dataset.group = lane.group;
-        set(el, ".lane-title", lane.title);
-        set(el, ".lane-dept", lane.dept);
-        set(el, ".lane-count", items.length);
-        const head = el.querySelector(".lane-header");
-        head.setAttribute("aria-expanded", !collapsed);
-        head.addEventListener("click", () => {
-          if (items.length) return;              // lanes with cards stay open
-          openLanes.has(lane.key) ? openLanes.delete(lane.key) : openLanes.add(lane.key);
-          renderBoard();
-        });
-        const list = el.querySelector(".lane-cards");
-        list.querySelector(".lane-empty").hidden = !!items.length;
-        items.forEach(({ data, r, ms }) => list.appendChild(rolloutCard(data, r, ms)));
-        kanban.appendChild(el);
-      });
-
-      const empty = LANES.filter(l => !byLane[l.key].length).length;
-      const t = document.getElementById("boardToggleEmpty");
-      t.hidden = !empty;
-      t.textContent = `${allEmptyOpen ? "Collapse" : "Expand"} ${empty} empty lane${empty === 1 ? "" : "s"}`;
-    }
-
-    function rolloutCard(data, r, ms){
-      const card = tpl("rolloutCardTemplate").firstElementChild.cloneNode(true);
-      const s = summarize(data);
-      set(card, ".rollout-card__customer", r.customer || "—");
-      nameLink(card.querySelector(".rollout-card__name"), data, r);
-      paintPeople(card.querySelector(".rollout-card__people"), r);
-      set(card, ".rollout-card__size", sizeText(s));
-
-      const btn = card.querySelector(".rollout-card__edit");
-      btn.dataset.rollout = r.id;
-      btn.dataset.refocus = `.rollout-card__edit[data-rollout="${r.id}"]`;
-      if (!ms){
-        /* Complete: nothing left to update here. */
-        card.classList.add("is-done");
-        card.querySelector(".status-dot").className = "status-dot status-dot--done";
-        set(card, ".rollout-card__date", "");
-        set(card, ".rollout-card__sub", "All milestones done");
-        btn.remove();
-        return card;
-      }
-      const m = milestones[r.id][ms.key] || {};
-      const st = milestoneStatus(m);
-      card.classList.add("is-" + st.state);
-      card.querySelector(".status-dot").className = "status-dot status-dot--" + st.state;
-      set(card, ".rollout-card__date", shortDate(st.date) || (st.state === "done" ? "✓" : "Not scheduled"));
-      set(card, ".rollout-card__sub", st.state === "empty" ? "" : st.sub);
-      card.querySelector(".rollout-card__note").hidden = !m.note;
-      btn.setAttribute("aria-label", `Update ${ms.label} for ${r.customer}${r.name ? " " + r.name : ""}`);
-      btn.title = m.note || "";
-      btn.addEventListener("click", () => openFlyout(r, ms, btn));
-      return card;
-    }
-
-    document.getElementById("boardToggleEmpty").addEventListener("click", () => {
-      allEmptyOpen = !allEmptyOpen;
-      openLanes.clear();
-      renderBoard();
-    });
-    renderBoard();
-
-    /* ── Drag to pan ─────────────────────────────────────────────
-       Trello-style, lifted from PL-JOBS-DASHBOARDS/person-dashboard.js:
-       grab the board anywhere that isn't a card or a lane header and
-       drag it sideways. Pointer capture keeps the drag alive off the
-       board, and a drag of more than a few pixels swallows the click
-       so panning never opens a card.
-       ------------------------------------------------------------ */
-    (function initPanning(){
-      let panning = false, startX = 0, startScroll = 0, moved = 0;
-      kanban.addEventListener("pointerdown", e => {
-        if (e.button !== 0) return;
-        if (e.target.closest(".rollout-card, .lane-header")) return;
-        panning = true; moved = 0;
-        startX = e.clientX; startScroll = kanban.scrollLeft;
-        kanban.setPointerCapture(e.pointerId);
-        kanban.classList.add("is-panning");
-      });
-      kanban.addEventListener("pointermove", e => {
-        if (!panning) return;
-        const dx = e.clientX - startX;
-        moved = Math.max(moved, Math.abs(dx));
-        kanban.scrollLeft = startScroll - dx;
-      });
-      function endPan(e){
-        if (!panning) return;
-        panning = false;
-        kanban.releasePointerCapture(e.pointerId);
-        kanban.classList.remove("is-panning");
-        if (moved > 4) kanban.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); },
-                                               { capture: true, once: true });
-      }
-      kanban.addEventListener("pointerup", endPan);
-      kanban.addEventListener("pointercancel", endPan);
-    })();
-
-    /* ── View switch ─────────────────────────────────────────── */
-    document.querySelectorAll("[data-view]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const view = btn.dataset.view;
-        document.querySelectorAll("[data-view]").forEach(b => {
-          const on = b === btn;
-          b.classList.toggle("is-active", on);
-          b.setAttribute("aria-pressed", on);
-        });
-        document.querySelector(".rollout-scroller").hidden = view !== "table";
-        document.getElementById("ganttView").hidden = view !== "gantt";
-        document.getElementById("boardView").hidden = view !== "board";
-        document.querySelectorAll("[data-hint]").forEach(h => { h.hidden = h.dataset.hint !== view; });
-      });
-    });
-
     /* ── Milestone flyout ────────────────────────────────────────
        One flyout, filled for the cell that opened it. Save writes
        target / actual / note and repaints that cell and its row's
@@ -885,9 +461,8 @@
     const fNote = document.getElementById("milestoneNote");
     let editing = null;   // {r, ms, td}
 
-    /* `origin` is what opened it: a table cell (td) or a Gantt dot. It
-       carries is-selected while the flyout is open and gets focus back
-       after. */
+    /* `origin` is the milestone dot that opened it. It carries
+       is-selected while the flyout is open and gets focus back after. */
     function openFlyout(r, ms, origin){
       if (editing) editing.origin.classList.remove("is-selected");
       const m = milestones[r.id][ms.key] || {};
@@ -912,8 +487,7 @@
       editing = null;
     }
 
-    /* Saves, then repaints both views: the table cell and its row's
-       summaries, and the Gantt (whose dot may have moved day). */
+    /* Saves, then repaints that row's milestone track. */
     function saveFlyout(){
       if (!editing) return;
       const { r, ms, origin } = editing;
@@ -925,17 +499,8 @@
       if (next.target || next.actual || next.note || next.done) milestones[r.id][ms.key] = next;
       else delete milestones[r.id][ms.key];
       paintSummaries(document.querySelector(`tr.rollout-row[data-rollout="${r.id}"]`), r);
-      /* Gantt dots and board cards are rebuilt, so focus goes back to
-         the rebuilt element named by the origin's data-refocus. */
-      const refocus = origin.dataset.refocus;
       closeFlyout();
       applyCompletedFilter();
-      renderGantt();
-      renderBoard();
-      if (refocus){
-        const again = document.querySelector(refocus);
-        again && again.focus();
-      }
     }
 
     document.getElementById("milestoneToday").addEventListener("click", () => {
@@ -962,15 +527,6 @@
            AppShell        → shared sidebar + .main-content (rollout-dashboard.css)
            Breadcrumbs     → .breadcrumb-bar, components/breadcrumbs/breadcrumbs.css
            DashTopbar      → <header class="dash-topbar">, .dash-topbar / .dash-title
-           ViewToggle      → .view-toggle in the topbar (Table / Gantt), aria-pressed
-           Board           → #boardView > .kanban; boardLaneTemplate (.lane,
-                             .lane-header, .lane-cards), rolloutCardTemplate
-                             (.rollout-card, stripe = status); lane and card
-                             pattern from PL-JOBS-DASHBOARDS/jobs-dashboard.css
-           Gantt           → #ganttView > .gantt (one CSS grid: label column +
-                             21 day columns); ganttWeekTemplate, ganttDayTemplate,
-                             ganttRolloutTemplate, ganttBarTemplate,
-                             ganttMarkerTemplate; .gantt__* styles
            StatusLegend    → .status-legend markup + styles; the dot is
                              components/status-dot/status-dot.css
            RolloutList     → <table class="rollout-list"> in .rollout-scroller
@@ -1002,40 +558,7 @@
            This is the computed replacement for the spreadsheet's Status
            Check column.
 
-         Board
-           One lane per milestone, in order; Billing Done is the last. A
-           rollout's lane is its first milestone not done (currentMilestone();
-           an actual date or a sheet tick counts as done), so entering an
-           actual moves the card one lane right; a rollout with everything
-           done sits in Billing Done. Each lane's top edge is its department
-           colour (the PL-JOBS-DASHBOARDS lane accent, keyed by data-group).
-           Drag the board background to pan sideways (initPanning(), from
-           PL-JOBS-DASHBOARDS/person-dashboard.js). Empty lanes
-           are 44px rails with a vertical label, as on the department board;
-           click one to open it, or "Expand N empty lanes". The card shows
-           customer (heaviest), rollout name (link), size, and the waiting
-           milestone's date and status; its right stripe is that status.
-           Clicking the card opens the flyout for that milestone. Cards are
-           not draggable — a rollout's lane is derived from its dates, so the
-           way to move one is to record the actual.
-
-         Gantt
-           Last week, this week and next week (Mon–Sun, 21 days) around
-           TODAY. One row per rollout (milestones never overlap, so they
-           share a track): a bar per department from its first to its last
-           milestone date (squared off where the window cuts it), a dot per
-           milestone on its date — actual if done, else
-           target — in its status colour, and "N earlier" / "N later" at the
-           edges for milestones outside the window. Dots open the same
-           flyout as the table cells; saving repaints both views. Weekends
-           are shaded and today's column is marked.
-
          Simulated in JS, becomes Angular state/events
-           - Table / Gantt is a view signal; the Gantt window (WEEK_START,
-             DAYS) would become inputs if it ever needs to page.
-           - Gantt positions are grid-column values set per element (the one
-             place a dynamic inline value is used) → [style.grid-column]
-             bindings.
            - Rows and cells are cloned from the templates → @for over
              rollouts, and over the milestone list inside each row.
            - Status is computed on paint from TODAY → a pure function / pipe.
@@ -1047,7 +570,7 @@
              helpers, shared with the manager's Overview) move to the
              rollout service.
 
-         Milestone track (the only table view)
+         Milestone track
            Each department is one td with an ol.ms-track; msStepTemplate is
            one li per milestone (link + dot button + pill label); the header
            th holds the same grid with the names, so they line up.
@@ -1059,8 +582,7 @@
 
          People avatars (components/avatar/avatar.css)
            .avatar-group with a CSR and a Sales .avatar, on the right of
-           the Customer / Rollout cell and above the status on a board
-           card. paintPeople() fills initials, data-color / data-shade + tooltip from
+           the Customer / Rollout cell. paintPeople() fills initials, data-color / data-shade + tooltip from
            window.ROLLOUT_PEOPLE (rollout-customers.js); an empty role is
            .is-unassigned. Becomes a shared <app-avatar> fed by the user
            directory.
@@ -1068,7 +590,7 @@
          Show completed (switch at the right of the status legend, components/switch/switch.css)
            isCompleted(r) = Billing Done has an actual date. Off by default:
            applyCompletedFilter() sets hidden on completed table rows and
-           updates the count; renderGantt() / renderBoard() skip them.
+           updates the count.
            Becomes a showCompleted signal / filter pipe in Angular.
 
          Summary rollouts
