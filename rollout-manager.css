@@ -33,10 +33,11 @@
   --rm-danger-text: var(--color-copper-600);
   --rm-danger-bg: var(--status-error-bg);
 
-  /* Grid geometry. Row height is set by the 28px cell plus its 1px
-     rule, so it does not land on the spacing scale. */
-  --rm-cell-height: 28px;
-  --rm-row-height: 29px;
+  /* Grid geometry. Cells have no set height: a row is its content
+     plus the 8px cell padding. An icon button (28px) in a cell pulls
+     in by this much top and bottom so it fits the text line and does
+     not make its row taller than the rest. */
+  --rm-cell-icon-pull: calc((var(--line-height-body-sm) - var(--scale-700)) / 2);
   /* The master ticket tables put only the job number in the row head. */
   --rm-rowhead-width: 150px;
   --rm-rowhead-width-dist: 188px;
@@ -46,6 +47,9 @@
   --rm-head-bg-hover: color-mix(in srgb, var(--interactive-default) 12%, var(--bg-subtle));
   --rm-head-bg-selected: color-mix(in srgb, var(--interactive-default) 18%, var(--bg-surface));
   --rm-rowhead-bg: var(--bg-muted);
+  /* A row while its header is hovered — lighter than the header's own
+     hover, and distinct from the selection tint. */
+  --rm-row-hover-bg: color-mix(in srgb, var(--interactive-default) 6%, var(--bg-surface));
   --rm-blank-bg: var(--bg-muted);
 
 
@@ -55,6 +59,23 @@
 
   /* Toast action link, on the inverse surface. */
   --rm-toast-action: var(--color-patina-200);
+
+  /* The shared flyout (components/flyout/flyout.css) reads these two.
+     Same values as rollout-dashboard.css. */
+  --shadow-panel: -4px 0 24px rgb(from var(--color-black) r g b / .15);
+  --duration-panel: .2s;
+
+  /* Versions flyout: the location-count column, so every name input
+     in the list is the same width whatever its count says. */
+  --rm-version-meta-width: 112px;
+
+  /* Placeholder text everywhere on the page (and an empty date's
+     mm/dd/yyyy). No placeholder token exists in design-tokens.css, and
+     --text-tertiary reads too heavy; candidate for --text-placeholder. */
+  --rm-placeholder-text: var(--color-titanium-700);
+
+  /* Rejected-input help text — the one place --color-red-900 goes. */
+  --rm-error-text: var(--color-red-900);
 }
 
 * { box-sizing: border-box; }
@@ -62,6 +83,13 @@
 [hidden] { display: none !important; }
 
 html { height: 100%; }
+
+/* ── Placeholder text ──────────────────────────────────────────
+   One colour for every placeholder on the page, and for an empty date
+   field's mm/dd/yyyy (marked .is-empty by the page's script).
+   ------------------------------------------------------------- */
+::placeholder { color: var(--rm-placeholder-text); opacity: 1; }
+input[type="date"].is-empty:not(:focus) { color: var(--rm-placeholder-text); }
 
 /* ── App shell ─────────────────────────────────────────────────
    The shared sidebar component inserts its <aside> as body's first
@@ -376,7 +404,9 @@ body {
   color: var(--text-secondary);
   font-weight: var(--font-weight-semibold);
 }
-.overview .ov-timeline td.ov-timeline__cell { padding: var(--scale-100); }
+/* An input cell is the field: the input fills it edge to edge and
+   carries the 8px padding itself, like a grid cell's editor. */
+.overview .ov-timeline td.ov-timeline__cell:has(.cell-field) { padding: 0; }
 /* Key dates (On Property, Goes Live): a target only, no status. */
 .overview .ov-timeline .ov-timeline__milestone--key { color: var(--text-secondary); }
 .overview .ov-timeline td.ov-timeline__cell--na { background: var(--bg-subtle); }
@@ -390,50 +420,57 @@ body {
 
 .cell-field {
   box-sizing: border-box;
+  display: block;
   width: 100%;
   min-width: 0;
   margin: 0;
-  height: var(--scale-700);
-  padding: 0 var(--scale-100);
-  border: 1px solid transparent;
-  border-radius: var(--border-radius-sm);
+  padding: var(--scale-200);
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--text-primary);
   font-family: inherit;
   font-size: var(--fontsize-body-sm);
+  line-height: var(--line-height-body-sm);
   font-variant-numeric: tabular-nums;
   appearance: none;
-  transition: border-color 90ms linear, background-color 90ms linear;
+  transition: background-color 90ms linear;
 }
-.cell-field.is-empty:not(:focus) { color: var(--text-tertiary); }
-.cell-field::placeholder { color: var(--text-tertiary); }
+.cell-field.is-empty:not(:focus) { color: var(--rm-placeholder-text); }
 /* A note wraps inside its cell and the field grows with it
    (field-sizing: content — where it is not supported the field keeps
    one line and scrolls). The row grows to the longest note. */
 .cell-field--note {
-  display: block;
   field-sizing: content;
-  height: auto;
-  min-height: var(--scale-700);
   max-height: 8lh;
-  padding-block: var(--scale-100);
-  line-height: var(--line-height-label);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   resize: none;
 }
 .overview .ov-timeline td.ov-timeline__cell--note,
 .overview .ov-timeline .ov-timeline__row--note > th { vertical-align: top; }
-.cell-field::-webkit-calendar-picker-indicator { opacity: 0; cursor: pointer; margin-left: 0; }
-.ov-timeline tr:hover .cell-field::-webkit-calendar-picker-indicator,
-.cell-field:focus::-webkit-calendar-picker-indicator { opacity: .6; }
-.ov-timeline tr:hover .cell-field:not(:focus) { border-color: var(--border-tertiary); background: var(--bg-surface); }
-.ov-timeline tr:hover .cell-field:hover:not(:focus) { border-color: var(--border-subtle); }
+/* The calendar icon would take ~20px from a narrow column and clip the
+   date, so it is stretched invisibly over the whole field instead:
+   clicking anywhere in the cell opens the picker, typing still works.
+   (Chromium/WebKit; other engines keep their own control.) */
+.cell-field[type="date"] { position: relative; }
+.cell-field::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/* Hover tints only the field under the pointer, not its whole row. */
+.cell-field:hover:not(:focus) { background: var(--bg-subtle); }
+/* Focus is the grid editor's inset edge. */
 .cell-field:focus {
   background: var(--bg-surface);
-  border-color: var(--border-focus);
-  outline: 2px solid var(--border-focus);
-  outline-offset: -1px;
+  outline: 2px solid var(--interactive-default);
+  outline-offset: -2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .cell-field, .detail-field { transition: none; }
@@ -447,12 +484,12 @@ body {
   border-collapse: collapse;
   background: none;
 }
+.overview table thead { position: static; }
 .overview table th,
 .overview table td {
   position: static;
-  height: auto;
   overflow: visible;
-  padding: var(--scale-200) var(--scale-300);
+  padding: var(--scale-200);
   border: 0;
   border-bottom: 1px solid var(--border-tertiary);
   font-size: var(--fontsize-body-sm);
@@ -652,8 +689,7 @@ table {
 th, td {
   border-right: 1px solid var(--border-tertiary);
   border-bottom: 1px solid var(--border-tertiary);
-  padding: 0;
-  height: var(--rm-row-height);
+  padding: var(--scale-200);
   text-align: left;
   font-weight: var(--font-weight-light);
   vertical-align: middle;
@@ -663,10 +699,11 @@ th, td {
 
 /* ── Two-row head ──────────────────────────────────────────────
    A spanning group header over the columns that share a group, with
-   each column's own label stacked beneath it. Both rows stick.
+   each column's own label stacked beneath it. The whole thead sticks,
+   so the second row needs no offset — rows have no fixed height to
+   offset by.
    ------------------------------------------------------------- */
-thead tr:first-child th { top: 0; }
-thead tr:nth-child(2) th { top: var(--rm-row-height); }
+thead { position: sticky; top: 0; z-index: 3; }
 
 /* The group header is a normal header cell (thead th), just spanning
    its ticket's columns. */
@@ -680,13 +717,10 @@ thead th {
   font-weight: var(--font-weight-semibold);
   font-size: var(--fontsize-body-sm);
   color: var(--text-primary);
-  position: sticky;
-  top: 0;
-  z-index: 3;
   border-top: 1px solid var(--border-tertiary);
   white-space: nowrap;
 }
-thead th:first-child { left: 0; z-index: 5; border-left: 1px solid var(--border-tertiary); }
+thead th:first-child { position: sticky; left: 0; z-index: 5; border-left: 1px solid var(--border-tertiary); }
 
 /* A hairline under the whole header, so the boundary stays crisp while
    rows pass beneath it. */
@@ -701,8 +735,8 @@ tbody th {
   border-left: 1px solid var(--border-tertiary);
 }
 
+/* The cell carries the padding; .cellpad and .val only lay out. */
 .cellpad {
-  padding: 0 var(--scale-200);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -712,18 +746,20 @@ th .cellpad {
   display: flex;
   align-items: center;
   gap: var(--scale-100);
-  height: var(--rm-cell-height);
 }
 
 /* ── Header interactions ───────────────────────────────────────
-   Row headers still click to select the row. Column headers do not
-   select: a movable one is the drag handle for reordering its
+   Row headers do not select either: hovering one highlights its whole
+   row (the header and every cell) so the row reads as one thing, and
+   its delete button shows. Column headers do not select: a movable one is the drag handle for reordering its
    column, a pinned one (Calculated Quantity, and every quantity
    column on the distribution list) is inert.
    ------------------------------------------------------------- */
 .hd { user-select: none; }
-tbody th.hd { cursor: pointer; }
+tbody th.hd { cursor: default; }
 tbody th.hd:hover { background: var(--rm-head-bg-hover); }
+/* Selected cells keep their selection tint. */
+tbody tr:has(> th.hd:hover) > td.cell:not(.sel) { background: var(--rm-row-hover-bg); }
 
 thead th.hd-move { cursor: grab; }
 thead th.hd-move:hover { background: var(--rm-head-bg-hover); }
@@ -771,23 +807,26 @@ thead th.hd-sel, tbody th.hd-sel { background: var(--rm-head-bg-selected); }
   font-size: var(--fontsize-label);
 }
 
-/* Rename affordance, revealed on header hover. */
-.pencil {
-  appearance: none;
-  border: 0;
-  background: none;
-  padding: var(--scale-50);
-  margin: 0;
-  line-height: 0;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  border-radius: var(--border-radius-sm);
-  opacity: 0;
+/* Row header buttons — the shared .icon-btn at the trailing edge of a
+   row header: edit (address rows on Shipping) and delete (master
+   ticket and address rows). Revealed on row-header hover or keyboard
+   focus. Markup is rowEditTemplate / rowDeleteTemplate. */
+.hd-action {
   flex: none;
+  margin-block: var(--rm-cell-icon-pull);
+  opacity: 0;
 }
-th:hover .pencil { opacity: 1; }
-.pencil:hover { color: var(--interactive-pressed); background: var(--bg-surface); }
-.pencil:focus-visible { opacity: 1; outline: 2px solid var(--border-focus); outline-offset: 0; }
+/* .cellpad clips, the label ellipsizes on its own (.hd-label), so the
+   header lets the pulled-in button overflow. */
+tbody th.hd .cellpad { overflow: visible; }
+tbody th.hd:hover .hd-action,
+.hd-action:focus-visible { opacity: 1; }
+.hd-action:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+/* A shipping exception's row header: indented under its address. */
+tbody th.hd-exception { background: var(--bg-surface); }
+tbody th.hd-exception .cellpad { padding-left: var(--scale-400); }
+tbody th.hd-exception .hd-label { color: var(--text-secondary); }
 
 /* Scope is stated in words in each header's sub-label, in the
    inspector and in the field menu, so there is no chip component
@@ -802,8 +841,6 @@ th:hover .pencil { opacity: 1; }
    ------------------------------------------------------------- */
 td.cell { cursor: cell; background: var(--bg-surface); }
 td.cell .val {
-  padding: 0 var(--scale-200);
-  height: var(--rm-cell-height);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -843,6 +880,14 @@ td.missing .val { color: var(--text-tertiary); font-style: italic; }
 td.derived,
 td.context { background: var(--bg-muted); cursor: default; user-select: none; }
 td.context .val { color: var(--text-secondary); }
+
+/* Receives, on Shipping: read-only, what the address gets. Wraps
+   rather than truncating — the whole list is the point. */
+td.receives { background: var(--bg-muted); cursor: default; user-select: none; }
+td.receives .val { color: var(--text-secondary); white-space: normal; }
+
+/* A shipping-exception field still following its address. */
+td.inherited .val { color: var(--text-tertiary); }
 
 /* A field that does not apply to this row — Old Job Num on a New Job,
    the field the JM modal collapses. Selectable, so it can be crossed
@@ -900,7 +945,8 @@ td.fillpreview { box-shadow: inset 0 0 0 1px var(--interactive-pressed); }
   width: 100%;
   height: 100%;
   border: 2px solid var(--interactive-default);
-  padding: 0 var(--scale-100);
+  /* Text stays where it sat in the cell: 8px less the 2px border. */
+  padding: 0 calc(var(--scale-200) - 2px);
   font: inherit;
   font-variant-numeric: tabular-nums;
   background: var(--bg-surface);
@@ -963,60 +1009,21 @@ td.bool.empty .val::before { content: none; }
 }
 
 /* ── Versions cell (.tier-*) ─────────────────────────────────────────────────
-   The Versions column on the master tickets table: chips on the shared
-   .pill, an add button, and a .pill-warn while addresses need a version.
-   Markup is tierCellTemplate / tierChipTemplate.
+   The Versions column on the master tickets table: the version count
+   and an edit button. Markup is tierCellTemplate.
    ------------------------------------------------------------- */
 .tier-cell { gap: var(--scale-100); }
-.tier-cell__chips {
-  display: flex;
-  gap: var(--scale-100);
-  min-width: 0;
-  overflow: hidden;
-}
-.tier-chip,
-.tier-missing {
-  flex: none;
-  font-family: inherit;
-  line-height: var(--line-height-label);
-  padding-block: var(--scale-25);
-  cursor: pointer;
-}
-.tier-chip__name { font-weight: var(--font-weight-medium); }
-.tier-chip__count {
-  color: var(--text-tertiary);
-  font-size: var(--fontsize-label);
-}
-.tier-chip:hover {
-  background: var(--interactive-bg-subtle);
-  border-color: var(--interactive-default);
-}
-.tier-chip:focus-visible,
-.tier-add:focus-visible,
-.tier-missing:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.tier-cell__count { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tier-edit:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
 
-.tier-add {
-  flex: none;
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--scale-500);
-  height: var(--scale-500);
-  padding: 0;
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--border-radius-full);
-  background: none;
-  color: var(--text-interactive);
-  font-size: var(--fontsize-label);
-  cursor: pointer;
-}
-.tier-add:hover {
-  border-style: solid;
-  border-color: var(--interactive-default);
-  background: var(--interactive-bg-subtle);
-}
-.tier-missing { white-space: nowrap; color: var(--text-primary); }
+/* The edit button is the shared .icon-btn, pushed to the end of the
+   cell. It never shrinks, and pulls in so the row stays one line tall. */
+.tier-edit { flex: none; margin-left: auto; margin-block: var(--rm-cell-icon-pull); }
+/* .val clips (for ellipsis), which would cut the pulled-in button's
+   top and bottom border; the count clips on its own instead. */
+td.cell .val.tier-cell { overflow: visible; }
+/* The Versions cell is not selectable: its controls are its buttons. */
+td.tiers { cursor: default; }
 
 /* ── Add row / add column affordances ─────────────────────────── */
 td.add, th.add {
@@ -1076,6 +1083,136 @@ tbody th.add { left: 0; }
   color: var(--text-tertiary);
   font-size: var(--fontsize-label);
   line-height: var(--line-height-body-sm);
+}
+
+/* ══ Versions flyout ══════════════════════════════════════════
+   The shared flyout (components/flyout/flyout.css) at the standard
+   aside width. Markup is #versionsFlyout and versionRowTemplate in
+   rollout-manager.html.
+   ───────────────────────────────────────────────────────────── */
+/* Page-level additions to the shared flyout, used by both flyouts:
+   .flyout-heading / -context / -hint / -actions / -help / -empty. */
+.flyout-heading { display: flex; flex-direction: column; gap: var(--scale-50); }
+.flyout-context,
+.flyout-hint { color: var(--text-tertiary); }
+.flyout-actions { display: flex; gap: var(--scale-300); }
+
+.versions-flyout__section { display: flex; flex-direction: column; gap: var(--scale-200); }
+.versions-flyout__mode {
+  padding-bottom: var(--scale-400);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.versions-flyout__switch { color: var(--text-primary); font-weight: var(--font-weight-medium); }
+.flyout-help,
+.flyout-empty {
+  margin: 0;
+  color: var(--text-tertiary);
+}
+
+.versions-flyout__section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--scale-200);
+  min-height: var(--scale-800);
+}
+.versions-flyout__section-title {
+  margin: 0;
+  font-size: var(--fontsize-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+/* Add version sits at the trailing edge of its heading. */
+.versions-flyout__section-head .btn-secondary { margin-left: auto; }
+
+/* Form controls — same names and values as the dashboard / inventory
+   .input, so the dev team's input component drops in. */
+.input {
+  box-sizing: border-box;
+  height: var(--scale-800);
+  min-width: 0;
+  padding: 0 var(--scale-200);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fontsize-body-sm);
+}
+.input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
+.input[aria-invalid] { border-color: var(--status-error-border); }
+
+.field-error {
+  margin: 0;
+  font-size: var(--fontsize-label);
+  color: var(--rm-error-text);
+}
+
+/* ── Version list ── name | count | remove, error below. */
+.version-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-tertiary);
+  border-radius: var(--border-radius-sm);
+}
+.version-list:empty { display: none; }
+.version-row {
+  display: grid;
+  align-items: center;
+  column-gap: var(--scale-300);
+  padding: var(--scale-200) var(--scale-300);
+  border-bottom: 1px solid var(--border-tertiary);
+}
+.version-row:last-child { border-bottom: 0; }
+
+.version-row { grid-template-columns: minmax(0, 1fr) var(--rm-version-meta-width) auto; }
+.version-row__meta { color: var(--text-tertiary); white-space: nowrap; text-align: right; }
+.version-row__error { grid-column: 1 / -1; padding-top: var(--scale-100); }
+
+/* ══ Shipping exceptions flyout ════════════════════════════════
+   The shared flyout. Rows are JM's checkbox row (create-customer
+   modal: .checkbox-row / .checkbox-desc / .checkbox-title /
+   .checkbox-sub), same colours; its 14px gap and padding are 12px
+   here to stay on the spacing scale.
+   ───────────────────────────────────────────────────────────── */
+.checkbox-list { display: flex; flex-direction: column; gap: var(--scale-200); }
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--scale-300);
+  padding: var(--scale-300);
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-surface);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.checkbox-row:hover { background: var(--bg-muted); border-color: var(--border-default); }
+.checkbox-row:has(input:checked) {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
+.checkbox-row:has(input:checked) .checkbox-title { color: var(--status-success-border); }
+.checkbox-row:has(input:focus-visible) { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: var(--scale-50) 0 0;
+  cursor: pointer;
+  accent-color: var(--status-success-border);
+  flex-shrink: 0;
+}
+.checkbox-desc { display: flex; flex-direction: column; }
+.checkbox-title {
+  font-size: var(--fontsize-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.checkbox-sub {
+  font-size: var(--fontsize-label);
+  color: var(--text-tertiary);
+  margin-top: var(--scale-50);
 }
 
 /* ══ Toast ════════════════════════════════════════════════════

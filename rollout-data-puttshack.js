@@ -4,7 +4,7 @@
    Chosen because it exercises versions: three master tickets x 20
    locations, where the Main Menu Card and Beverage Menu Inserts
    each come in two versions (T1 for Boston, Miami, Nashville; T2 for
-   the rest) and the Dessert Menu Card is one design for everyone.
+   the rest) and the Dessert Menu Card has no versions.
 
    Where each piece came from:
      versions   -> ticket names, sizes and stocks from the client

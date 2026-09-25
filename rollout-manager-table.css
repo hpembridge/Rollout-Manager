@@ -22,6 +22,10 @@
   --shadow-panel: 0 4px 16px rgb(from var(--color-black) r g b / .12);
   --duration-fast: .15s;
 
+  /* Placeholder text — same value as rollout-manager.css. No
+     placeholder token in design-tokens.css yet. */
+  --rmt-placeholder-text: var(--color-titanium-700);
+
   /* Row height that fits a three-line address without the shipping
      fields floating: set by the address block, not the scale. */
   --rmt-row-height: 64px;
@@ -245,7 +249,7 @@ th[aria-sort] .th-sort i { opacity: 1; }
   transition: border-color 90ms linear, background-color 90ms linear;
 }
 .cell-field.is-num { text-align: right; font-variant-numeric: tabular-nums; }
-.cell-field::placeholder { color: var(--text-tertiary); }
+.cell-field::placeholder { color: var(--rmt-placeholder-text); }
 
 /* The row is the unit of discovery: hovering it outlines every
    field in it at once; the one under the pointer takes the
@@ -283,7 +287,7 @@ table.data tbody tr:hover .cell-field:hover:not(:focus) { border-color: var(--bo
   font-size: var(--fontsize-body-sm);
 }
 .search-input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
-.search-input::placeholder { color: var(--text-tertiary); }
+.search-input::placeholder { color: var(--rmt-placeholder-text); }
 
 .table-wrap { overflow: auto; max-height: 62vh; }
 .dist-table { table-layout: auto; }
@@ -480,7 +484,7 @@ table.data tbody tr:hover .cell-field:hover:not(:focus) { border-color: var(--bo
   color: var(--text-primary);
 }
 .form-input:focus, .form-select:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
-.form-input::placeholder { color: var(--text-tertiary); }
+.form-input::placeholder { color: var(--rmt-placeholder-text); }
 .form-select { cursor: pointer; }
 .form-row { display: grid; gap: var(--scale-400); }
 .form-row-2 { grid-template-columns: 1fr 1fr; }

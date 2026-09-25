@@ -878,6 +878,8 @@
        discard.
        ------------------------------------------------------------ */
     const flyout = document.getElementById("milestoneFlyout");
+    /* An empty date shows mm/dd/yyyy in the placeholder colour. */
+    const markEmpty = inp => inp.classList.toggle("is-empty", !inp.value);
     const fTarget = document.getElementById("milestoneTarget");
     const fActual = document.getElementById("milestoneActual");
     const fNote = document.getElementById("milestoneNote");
@@ -895,6 +897,7 @@
       set(flyout, "#milestoneFlyoutContext", `${r.name} · ${GROUP_NAMES[ms.group]}`);
       fTarget.value = m.target || "";
       fActual.value = m.actual || "";
+      markEmpty(fTarget); markEmpty(fActual);
       fNote.value = m.note || "";
       flyout.classList.add("open");
       (m.target ? fActual : fTarget).focus();
@@ -936,9 +939,10 @@
     }
 
     document.getElementById("milestoneToday").addEventListener("click", () => {
-      fActual.value = toISO(TODAY); fActual.focus();
+      fActual.value = toISO(TODAY); markEmpty(fActual); fActual.focus();
     });
     document.getElementById("milestoneSave").addEventListener("click", saveFlyout);
+    [fTarget, fActual].forEach(inp => inp.addEventListener("input", () => markEmpty(inp)));
     flyout.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeFlyout));
     /* A click on the dimmed overlay, not the panel, cancels. */
     flyout.addEventListener("click", e => { if (e.target === flyout) closeFlyout(); });

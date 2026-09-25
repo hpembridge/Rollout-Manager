@@ -31,9 +31,21 @@
 
   --shadow-panel: -4px 0 24px rgb(from var(--color-black) r g b / .15);
   --duration-panel: .2s;
+
+  /* Placeholder text — same value as rollout-manager.css. No
+     placeholder token in design-tokens.css yet. */
+  --dash-placeholder-text: var(--color-titanium-700);
 }
 
 * { box-sizing: border-box; }
+
+/* ── Placeholder text ──────────────────────────────────────────
+   One colour for every placeholder on the page, and for an empty date
+   field's mm/dd/yyyy (marked .is-empty by the page's script).
+   ------------------------------------------------------------- */
+::placeholder { color: var(--dash-placeholder-text); opacity: 1; }
+input[type="date"].is-empty:not(:focus) { color: var(--dash-placeholder-text); }
+
 
 /* ── App shell ─────────────────────────────────────────────── */
 body {

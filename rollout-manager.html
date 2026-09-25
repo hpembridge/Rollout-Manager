@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=optional" rel="stylesheet" />
     <link rel="stylesheet" href="components/status-dot/status-dot.css" />
     <link rel="stylesheet" href="components/avatar/avatar.css" />
+    <link rel="stylesheet" href="components/flyout/flyout.css" />
+    <link rel="stylesheet" href="components/switch/switch.css" />
     <link rel="stylesheet" href="rollout-manager.css" />
     <link rel="stylesheet" href="components/breadcrumbs/breadcrumbs.css" />
     <!-- Seed rollouts. Each registers itself in window.ROLLOUTS by id;
@@ -91,8 +93,8 @@
         <div class="page-width">
           <div class="tab-row" role="group" aria-label="View">
             <button class="tab-btn active" type="button" id="tabOverview" aria-pressed="true">Overview</button>
-            <button class="tab-btn" type="button" id="tabMaster" aria-pressed="false">Master tickets</button>
-            <button class="tab-btn" type="button" id="tabShip" aria-pressed="false">Shipping</button>
+            <button class="tab-btn" type="button" id="tabMaster" aria-pressed="false">Tickets</button>
+            <button class="tab-btn" type="button" id="tabShip" aria-pressed="false">Delivery</button>
             <button class="tab-btn" type="button" id="tabDist" aria-pressed="false">Distribution</button>
           </div>
 
@@ -342,25 +344,34 @@
       </template>
 
       <!-- ══ Tier cell ════════════════════════════════════════
-           The Tiers column on the master tickets table. One chip per
-           tier on that ticket (name + how many addresses are on it),
-           then the add button. The warning pill shows only while some
-           address with a quantity has no tier yet. tierCell() clones
-           these; in Angular, an @for over version.tiers.
+           The Versions column on the master tickets table. Read-only:
+           how many versions the ticket has ("One version" when it has
+           none, "4 versions", "20 versions · one per location"), then
+           the edit button, which opens the Versions flyout. tierCell()
+           clones this.
            ───────────────────────────────────────────────────── -->
       <template id="tierCellTemplate">
         <span class="val tier-cell">
-          <span class="tier-cell__chips"></span>
-          <button class="tier-add" type="button" aria-label="Add version" title="Add version">
-            <i class="fa-regular fa-plus" aria-hidden="true"></i>
+          <span class="tier-cell__count"></span>
+          <button class="icon-btn tier-edit" type="button" aria-label="Edit versions" title="Edit versions">
+            <i class="fa-regular fa-pen" aria-hidden="true"></i>
           </button>
-          <button class="pill pill-warn tier-missing" type="button" hidden></button>
         </span>
       </template>
-      <template id="tierChipTemplate">
-        <button class="pill tier-chip" type="button">
-          <span class="tier-chip__name"></span>
-          <span class="tier-chip__count"></span>
+      <!-- ══ Row delete ═══════════════════════════════════════
+           Buttons at the end of a row header, both the shared .icon-btn:
+           edit (address rows on Delivery — opens the Shipping
+           exceptions flyout) and delete (master ticket and address
+           rows). addRowButton() clones them.
+           ───────────────────────────────────────────────────── -->
+      <template id="rowEditTemplate">
+        <button class="icon-btn hd-action" type="button">
+          <i class="fa-regular fa-pen" aria-hidden="true"></i>
+        </button>
+      </template>
+      <template id="rowDeleteTemplate">
+        <button class="icon-btn hd-action hd-delete" type="button">
+          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
         </button>
       </template>
       <!-- ══ /Tier cell ═══════════════════════════════════════ -->
@@ -401,6 +412,165 @@
 
     </div>
     <!-- /.main-content -->
+
+    <!-- ══ Versions flyout ═══════════════════════════════════
+         Opened from the Versions cell on the master tickets table
+         (edit button, any chip, or the warning pill; Enter or Space on
+         the selected cell). The shared flyout
+         (components/flyout/flyout.css) at the standard aside width.
+
+         Works on a draft: nothing touches the rollout until Save, and
+         Save is one undo step. Cancel, the close button, the overlay
+         and Esc discard.
+
+         Two modes, set by the switch:
+           Shared versions   → VersionList: add / rename / remove the
+                               ticket's versions. Which location gets
+                               which is set on Distribution (the
+                               Version column), not here.
+           Each location     → no list; every location with a quantity
+                               on the ticket gets a version of its own,
+                               named for the location.
+         ──────────────────────────────────────────────────────── -->
+    <div class="flyout-overlay" id="versionsFlyout">
+      <div class="flyout-panel" role="dialog" aria-modal="true" aria-labelledby="versionsFlyoutTitle">
+
+        <div class="flyout-header">
+          <div class="flyout-heading">
+            <span class="flyout-title" id="versionsFlyoutTitle">Versions</span>
+            <span class="flyout-context" id="versionsFlyoutContext"></span>
+          </div>
+          <button class="icon-btn" type="button" data-close aria-label="Close">
+            <i class="fa-regular fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="flyout-body">
+
+          <!-- VersionMode -->
+          <section class="versions-flyout__section versions-flyout__mode">
+            <label class="switch versions-flyout__switch">
+              <input type="checkbox" id="versionsPerLocation" />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Every location gets its own version</span>
+            </label>
+            <!-- Shown only while the switch is on. -->
+            <p class="flyout-help" id="versionsModeHelp" hidden></p>
+          </section>
+          <!-- /VersionMode -->
+
+          <!-- VersionList — shared mode only -->
+          <section class="versions-flyout__section" id="versionListSection">
+            <header class="versions-flyout__section-head">
+              <h3 class="versions-flyout__section-title">Versions</h3>
+              <button class="btn-secondary" type="button" id="versionAdd">
+                <i class="fa-regular fa-plus" aria-hidden="true"></i> Add version
+              </button>
+            </header>
+            <p class="flyout-help">
+              Versions are different variations of a product. Each version can have its own production ticket while remaining connected to the same master ticket. This helps ensure the correct content is produced and shipped to the right place.
+            </p>
+            <p class="flyout-empty" id="versionListEmpty">
+              Every location receives the same version
+            </p>
+            <ul class="version-list" id="versionList">
+              <!-- versionRowTemplate rows go here -->
+            </ul>
+            <!-- Shown after a Save attempt with exactly one version. -->
+            <p class="field-error" id="versionListError" hidden>
+              A ticket needs at least two versions. Add another, or remove this one so every location receives the same version.
+            </p>
+          </section>
+          <!-- /VersionList -->
+
+
+        </div>
+
+        <div class="flyout-footer">
+          <span class="flyout-hint">Enter saves · Esc cancels</span>
+          <div class="flyout-actions">
+            <button class="btn-secondary" type="button" data-close>Cancel</button>
+            <button class="btn-primary" type="button" id="versionsSave">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- One version in VersionList: its name (editable), how many
+         locations are on it (and its own job number, if it has one),
+         and remove. In Angular, an @for over the draft's versions. -->
+    <template id="versionRowTemplate">
+      <li class="version-row">
+        <input class="input version-row__name" type="text" aria-label="Version name" />
+        <span class="version-row__meta"></span>
+        <button class="icon-btn version-row__remove" type="button" aria-label="Remove version" title="Remove version">
+          <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+        </button>
+        <p class="field-error version-row__error" hidden></p>
+      </li>
+    </template>
+
+    <!-- ══ /Versions flyout ══════════════════════════════════ -->
+
+    <!-- ══ Shipping exceptions flyout ═════════════════════════
+         Opened from the edit button on an address row on Delivery.
+         One checkbox row per master ticket the address receives
+         (JM's .checkbox-row, from the create-customer modal). A
+         checked one becomes a child row under the address on
+         Shipping, where its fields can differ from the address's.
+         Works on a draft; Save is one undo step. Unchecking one that
+         has changes drops those changes.
+         ──────────────────────────────────────────────────────── -->
+    <div class="flyout-overlay" id="shipExcFlyout">
+      <div class="flyout-panel" role="dialog" aria-modal="true" aria-labelledby="shipExcTitle">
+
+        <div class="flyout-header">
+          <div class="flyout-heading">
+            <span class="flyout-title" id="shipExcTitle">Shipping exceptions</span>
+            <span class="flyout-context" id="shipExcContext"></span>
+          </div>
+          <button class="icon-btn" type="button" data-close aria-label="Close">
+            <i class="fa-regular fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="flyout-body">
+          <p class="flyout-help">
+            Check a version to give it its own shipping details. It gets its own row under this address, and any field you leave alone follows the address.
+          </p>
+          <p class="flyout-empty" id="shipExcEmpty" hidden>
+            This address isn't receiving anything yet. Enter quantities on Distribution.
+          </p>
+          <div class="checkbox-list" id="shipExcList">
+            <!-- shipExcRowTemplate rows go here -->
+          </div>
+        </div>
+
+        <div class="flyout-footer">
+          <span class="flyout-hint">Esc cancels</span>
+          <div class="flyout-actions">
+            <button class="btn-secondary" type="button" data-close>Cancel</button>
+            <button class="btn-primary" type="button" id="shipExcSave">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- One ticket the address receives. Title is the ticket and its
+         version; sub is quantity and job, plus how many fields differ
+         once it is an exception. In Angular, an @for over versionsFor(). -->
+    <template id="shipExcRowTemplate">
+      <label class="checkbox-row">
+        <input type="checkbox" />
+        <span class="checkbox-desc">
+          <span class="checkbox-title"></span>
+          <span class="checkbox-sub"></span>
+        </span>
+      </label>
+    </template>
+    <!-- ══ /Shipping exceptions flyout ════════════════════════ -->
 
 <script>
 "use strict";
@@ -539,7 +709,6 @@ function detailName(d){
   return names.length===1 ? names[0] : "";
 }
 
-const PENCIL = `<button class="pencil" title="Rename" aria-label="Rename"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M8.3 1.2l2.5 2.5-6 6-3.1.6.6-3.1z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg></button>`;
 
 /* The drag affordance on a movable column header. Six dots, the usual
    grip, held at a fixed width so hovering does not shift the label. */
@@ -566,6 +735,12 @@ let state = {
 
   /* Address-scoped values, keyed "aId::fId". */
   addrValues: {...SEED.addrValues},
+
+  /* Shipping exceptions: a master ticket an address receives that ships
+     differently from the rest of that address. Keyed "aId::vId"; the
+     value holds only the fields changed for it ({fId: value}). A field
+     not in it follows the address. Presence of the key IS the exception. */
+  shipExc: JSON.parse(JSON.stringify(SEED.shipExc || {})),
 
   /* Milestone dates for the Overview timeline, {key: {target, actual,
      note}}. Read-only here; edited on the dashboard. */
@@ -621,9 +796,9 @@ function versionTotal(vId){
    on them, so a tier has a name and nothing else. Specs stay on the
    master ticket's details.
 
-   A ticket with no tiers is one design for everyone and gets no Tier
-   column on the distribution. Membership is still the quantity; the
-   tier only says WHICH design an address that receives it gets.
+   A ticket with no tiers has no versions and gets no Tier column on
+   the distribution. Membership is still the quantity; the tier only
+   says WHICH version an address that receives it gets.
    ------------------------------------------------------------- */
 const tiersOf  = vId => (VER(vId) && VER(vId).tiers) || [];
 const hasTiers = vId => tiersOf(vId).length > 0;
@@ -636,7 +811,7 @@ function setTier(vId, aId, tId){
 }
 const addressesOnTier = (vId,tId) => addressesOn(vId).filter(a=>getTier(vId,a.id)===tId);
 /* Receiving a tiered ticket with no tier is half an entry — it cannot
-   become a ticket until someone says which design it gets. */
+   become a ticket until someone says which version it gets. */
 const needsTier = (vId,aId) => hasTiers(vId) && receives(vId,aId) && !TIER(vId, getTier(vId,aId));
 const untiered  = vId => addressesOn(vId).filter(a=>needsTier(vId, a.id));
 const findTierByName = (vId, name) => {
@@ -645,22 +820,59 @@ const findTierByName = (vId, name) => {
 };
 /* What a spun-off ticket is called: master, tier (if any), address —
    "Main Menu Card - T1 - Boston", "Dessert Menu Card - Boston". */
-const ticketName = (vId,aId) =>
-  [VER(vId).desc || VER(vId).job, tierName(vId,aId), ADDR(aId).name].filter(Boolean).join(" - ");
+const ticketName = (vId,aId) => {
+  const t = tierName(vId,aId), a = ADDR(aId).name;
+  /* An each-location version named for its location would repeat it. */
+  return [VER(vId).desc || VER(vId).job, t.toLowerCase()===a.toLowerCase() ? "" : t, a].filter(Boolean).join(" - ");
+};
+
+/* ── Shipping exceptions ───────────────────────────────────────
+   See state.shipExc. An exception is listed only while the address
+   still receives that ticket; its data is kept (and comes back) if the
+   quantity is cleared and re-entered.
+   ------------------------------------------------------------- */
+const excKey  = (aId,vId) => aId+"::"+vId;
+const hasExc  = (aId,vId) => !!state.shipExc[excKey(aId,vId)];
+const excsFor = aId => versionsFor(aId).filter(v=>hasExc(aId, v.id));
+/* The exception's own value, or undefined where it follows the address. */
+function excVal(aId, vId, fId){
+  const o=state.shipExc[excKey(aId,vId)];
+  return o && Object.prototype.hasOwnProperty.call(o, fId) ? o[fId] : undefined;
+}
+/* Clearing a field puts it back to following the address. */
+function setExcValue(aId, vId, fId, raw){
+  const o=state.shipExc[excKey(aId,vId)]; if(!o) return;
+  const val=String(raw).trim();
+  if(val==="") delete o[fId]; else o[fId]=val;
+}
+/* What an address receives, as the Receives column and the flyout say
+   it: "Main Menu Card — T1", and with its quantity "200 Main Menu Card — T1". */
+const fmtQty = q => isNaN(+q) || String(q).trim()==="" ? String(q) : (+q).toLocaleString();
+const lineName = (aId, v) => { const t=tierName(v.id, aId); return (v.desc || v.job) + (t ? " — "+t : ""); };
+const lineFor  = (aId, v) => `${fmtQty(getQty(v.id, aId))} ${lineName(aId, v)}`;
+/* The address row lists only what ships with it: a ticket that is an
+   exception is on its own child row instead. */
+const receivesText = aId => versionsFor(aId).filter(v=>!hasExc(aId, v.id)).map(v=>lineFor(aId, v)).join(", ");
+
+/* Production tickets: one per version, and one for a master ticket with
+   no versions. Each-location tickets count one per location. */
+const productionCount = () => state.versions.reduce((n,v)=>n + Math.max(1, tiersOf(v.id).length), 0);
 
 /* ============================ HISTORY ============================ */
 const snap = ()=>JSON.stringify({v:state.versions,a:state.addresses,
-  q:state.qtys,t:state.tierOf,av:state.addrValues,ms:state.milestones,ro:state.rollout,f:FIELDS,jf:JOBFIELDS,s:SPECS});
+  q:state.qtys,t:state.tierOf,av:state.addrValues,x:state.shipExc,ms:state.milestones,ro:state.rollout,f:FIELDS,jf:JOBFIELDS,s:SPECS});
 let past=[], future=[], pending=null;
 function begin(){ pending = snap(); }
 function commit(){
   if(pending==null) return;
+  /* Part of the same step, so undo takes it back with the edit. */
+  state.versions.forEach(v=>{ if(v.perLocation) syncPerLocation(v); });
   if(pending!==snap()){ past.push(pending); if(past.length>80) past.shift(); future=[]; }
   pending=null; render();
 }
 function restore(js){
   const o=JSON.parse(js);
-  state.versions=o.v; state.addresses=o.a; state.qtys=o.q; state.tierOf=o.t||{}; state.addrValues=o.av;
+  state.versions=o.v; state.addresses=o.a; state.qtys=o.q; state.tierOf=o.t||{}; state.addrValues=o.av; state.shipExc=o.x||{};
   state.milestones=o.ms||{}; state.rollout=o.ro||state.rollout;
   FIELDS=o.f; reindexFields();
   JOBFIELDS=o.jf||JOBFIELDS; reindexJobFields();
@@ -688,7 +900,7 @@ function masterTable(){
   return {
     id:"master", kind:"master",
     title:"Master tickets",
-    sub:`${state.versions.length} ticket${state.versions.length===1?"":"s"} in this rollout`,
+    sub:`${plural(state.versions.length, "master ticket")} · ${plural(productionCount(), "production ticket")}`,
     rowHead:"Master Ticket",
     rows: state.versions.map(v=>({key:v.id, kind:"version", label:v.job}))
            .concat([{key:"__add", kind:"addrow", label:"+ Add Master Ticket"}]),
@@ -766,25 +978,53 @@ function detailTable(d){
 }
 
 /* ── Shipping ──────────────────────────────────────────────────
-   How each address ships. One value per address, whatever it is
-   receiving, so nothing here varies by master ticket.
+   How each address ships. One row per address, then one child row per
+   shipping exception under it (a ticket that address receives which
+   ships differently). First column is Receives — read-only, what the
+   address gets, from Distribution. The shipping fields are fixed: no
+   "+ Add field" and no column reordering on this tab.
    ------------------------------------------------------------- */
 function shipTable(){
   return {
     id:"ship", kind:"ship",
-    title:"Shipping",
+    title:"Delivery",
     sub:`${state.addresses.length} address${state.addresses.length===1?"":"es"}`,
     rowHead:"Address",
-    rows: addressRows(),
-    cols: FIELDS.map(f=>({key:f.id, kind:"field", label:f.name, num:f.num,
-              w:f.id==="notes"?230:160, movable:true}))
-          .concat([{key:"__addfield", kind:"addcol", label:"+ Add field", w:118}]),
+    rows: shipRows(),
+    cols: [{key:"__receives", kind:"receives", label:"Receives", w:340, pinned:true}]
+          .concat(FIELDS.map(f=>({key:f.id, kind:"field", label:f.name, num:f.num,
+              w:f.id==="notes"?230:160, pinned:true}))),
     cellAt(rk, ck){
-      if(rk==="__add"||ck==="__addfield") return {kind:"blank"};
+      if(rk==="__add") return {kind:"blank"};
+      const [aId, vId] = rk.split("::");
+      if(ck==="__receives"){
+        const txt = vId ? lineFor(aId, VER(vId)) : receivesText(aId);
+        return {kind:"data", value:txt, display:txt, editable:false, receives:true};
+      }
+      if(vId){
+        /* An exception row shows the address's value until it has its
+           own; "inherited" greys it so the difference reads at a glance. */
+        const own = excVal(aId, vId, ck);
+        const val = own ?? addrVal(aId, ck);
+        return {kind:"data", value:val, display:val, num:FIELD[ck].num, editable:true,
+                inherited: own===undefined && val!==""};
+      }
       const val=addrVal(rk, ck);
       return {kind:"data", value:val, display:val, num:FIELD[ck].num, editable:true};
     }
   };
+}
+
+/* Addresses, each followed by its exception rows. */
+function shipRows(){
+  const rows=[];
+  state.addresses.forEach(a=>{
+    rows.push({key:a.id, kind:"address", label:a.name, sub:[a.code, a.city].filter(Boolean).join(" · ")});
+    /* A child row's Address cell is blank: its Receives cell says what it is. */
+    excsFor(a.id).forEach(v=>rows.push({key:excKey(a.id, v.id), kind:"exception",
+      address:a.id, version:v.id, label:""}));
+  });
+  return rows.concat([{key:"__add", kind:"addrow", label:"+ New address"}]);
 }
 
 /* ── Distribution ──────────────────────────────────────────────
@@ -820,13 +1060,16 @@ function distTable(){
       /* Tier: typed like Job Type — completes from this ticket's
          tiers and refuses anything else. */
       const val=tierName(vId, rk);
+      /* Each location has its own: nothing to choose, so not typed. */
+      if(VER(vId).perLocation)
+        return {kind:"data", value:val, display:val, editable:false, tier:true, perLoc:true};
       return {kind:"data", value:val, display:val, editable:true, tier:true,
               options:tiersOf(vId).map(t=>t.name), flag:needsTier(vId, rk)};
     }
   };
 }
 
-/* Both address tables list the same rows, and both can add one. */
+/* The distribution's rows: every address, and the add row. */
 function addressRows(){
   return state.addresses.map(a=>({key:a.id, kind:"address", label:a.name,
            sub:[a.code, a.city].filter(Boolean).join(" · ")}))
@@ -852,10 +1095,11 @@ const norm = s => s && {t:s.t, r0:Math.min(s.r0,s.r1), r1:Math.max(s.r0,s.r1),
                         c0:Math.min(s.c0,s.c1), c1:Math.max(s.c0,s.c1)};
 
 /* A derived or context column is read-only chrome, so its cells are not
-   selectable at all — nothing to edit, copy out of or clear. */
+   selectable at all — nothing to edit, copy out of or clear. The
+   Versions column is the same: its buttons are its controls. */
 const colSelectable = (t,c)=>{
   const T=TM(t); const C=T&&T.cols[c];
-  return !!C && C.kind!=="addcol" && C.kind!=="derived" && C.kind!=="context";
+  return !!C && C.kind!=="addcol" && C.kind!=="derived" && C.kind!=="context" && C.kind!=="tiers" && C.kind!=="receives";
 };
 const selectable = (t,r,c)=>{
   const T=TM(t); const R=T&&T.rows[r];
@@ -1193,22 +1437,24 @@ function buildTable(T,t){
       th.onclick=()=> T.kind==="master" ? addVersion() : newAddress();
     } else {
       th.className="hd" + (s&&s.t===t&&ri>=s.r0&&ri<=s.r1 ? " hd-sel":"");
+      th.dataset.row=R.key;
       const sub = R.sub || "";
-      /* Renaming happens where the thing is owned: a job number on the
-         master tickets table, an address on the distribution list. The
+      /* Deleting happens where the thing is owned: a master ticket on
+         the master tickets table, an address on the address tables. The
          detail tables carry the job number as read-only context. */
       const own = T.kind==="master" ? R.kind==="version" : R.kind==="address";
       th.innerHTML=`<span class="cellpad"><span class="hd-label">${esc(R.label)}${
-        sub?`<span class="sub"> · ${esc(sub)}</span>`:""}</span>${own?PENCIL:""}</span>`;
-      th.onclick=()=>{ sel={t,r0:ri,c0:0,r1:ri,c1:T.cols.length-1}; clampSel(); render(); };
+        sub?`<span class="sub"> · ${esc(sub)}</span>`:""}</span></span>`;
       if(R.kind==="version" && T.kind==="master"){
         th.oncontextmenu=e=>{e.preventDefault(); versionMenu(e,R.key);};
-        wirePencil(th, ()=>VER(R.key).job, n=>VER(R.key).job=n);
+        if(own) addRowDelete(th, "Delete master ticket", ()=>deleteVersion(R.key));
       }
       if(R.kind==="address"){
         th.oncontextmenu=e=>{e.preventDefault(); addressMenu(e, R.key);};
-        wirePencil(th, ()=>ADDR(R.key).name, n=>ADDR(R.key).name=n);
+        if(T.kind==="ship") addRowButton(th, "rowEditTemplate", "Shipping exceptions", ()=>openShipExc(R.key));
+        if(own) addRowDelete(th, "Remove address from rollout", ()=>removeAddress(R.key));
       }
+      if(R.kind==="exception"){ th.classList.add("hd-exception"); tr.classList.add("row-exception"); }
     }
     tr.appendChild(th);
 
@@ -1231,6 +1477,8 @@ function buildTable(T,t){
       if(!cell.tiers && !String(cell.display||"").length) cls.push("empty");
       if(cell.bool) cls.push("bool");
       if(cell.tiers) cls.push("tiers");
+      if(cell.receives) cls.push("receives");
+      if(cell.inherited) cls.push("inherited");
       td.className=cls.join(" ");
       /* A checkbox cell renders the control itself — there is nothing to
          type into it, so it has no editor. The tiers cell is chips from
@@ -1248,31 +1496,14 @@ function buildTable(T,t){
   return tbl;
 }
 
-/* The Tiers cell: a chip per tier, the add button, and a warning while
-   any address receiving the ticket has no tier. Markup is the two
-   templates in the page. */
+/* The Versions cell: the ticket's version count and the edit button,
+   which opens the Versions flyout. Markup is tierCellTemplate. */
 function tierCell(vId){
+  const v = VER(vId), n = tiersOf(vId).length;
   const cell = document.getElementById("tierCellTemplate").content.firstElementChild.cloneNode(true);
-  const chips = cell.querySelector(".tier-cell__chips");
-  const chipTpl = document.getElementById("tierChipTemplate").content.firstElementChild;
-  tiersOf(vId).forEach(tier=>{
-    const chip = chipTpl.cloneNode(true);
-    const n = addressesOnTier(vId, tier.id).length;
-    chip.querySelector(".tier-chip__name").textContent = tier.name;
-    chip.querySelector(".tier-chip__count").textContent = n;
-    chip.title = `${tier.name}${tier.job?" · job "+tier.job:""} · ${n} address${n===1?"":"es"}`;
-    chip.onclick = e=>tierMenu(e, vId, tier.id);
-    chips.appendChild(chip);
-  });
-  cell.querySelector(".tier-add").onclick = ()=>addTier(vId);
-  const missing = untiered(vId).length;
-  const warn = cell.querySelector(".tier-missing");
-  if(missing){
-    warn.hidden = false;
-    warn.textContent = `${missing} need${missing===1?"s":""} a version`;
-    warn.title = "Addresses with a quantity but no version. Assign them on the distribution.";
-    warn.onclick = ()=>{ state.view="dist"; sel=null; render(); };
-  }
+  cell.querySelector(".tier-cell__count").textContent =
+    !n ? "One version" : plural(n, "version") + (v.perLocation ? " · one per location" : "");
+  cell.querySelector(".tier-edit").onclick = e=>openVersions(vId, e.currentTarget);
   return cell;
 }
 
@@ -1373,10 +1604,16 @@ function startEdit(t,r,c,seed){
     if(cell.derived) toast("This is the total of its addresses' quantities.", "Open distribution", ()=>{
       state.view="dist"; sel=null; render();
     });
-    else if(cell.context) toast("Set on the master ticket.", "Open master tickets", ()=>{
+    else if(cell.context) toast("Set on the master ticket.", "Open tickets", ()=>{
       state.view="master"; sel=null; render();
     });
-    else if(cell.tiers) toast("Add a version with +. Click a version to rename or remove it.");
+    else if(cell.receives) toast("What each address receives is set on Distribution.", "Open distribution", ()=>{
+      state.view="dist"; sel=null; render();
+    });
+    else if(cell.tiers){ const td=tierCellEl(cell.version); openVersions(cell.version, td && td.querySelector(".tier-edit")); }
+    else if(cell.perLoc) toast("Every location has its own version on this ticket, named for the location.", "Open tickets", ()=>{
+      state.view="master"; sel=null; render();
+    });
     else if(cell.na) toast("Old Job Num applies to a re-run or a pull-plate. Set Job Type first.");
     return;
   }
@@ -1551,13 +1788,15 @@ function applyValue(t,r,c,val){
   } else if(C.kind==="qty"){
     setQty(C.version, R.key, val);
   } else if(C.kind==="tier"){
+    if(VER(C.version).perLocation) return;
     /* Stored by id, typed by name. A pasted name that is not one of
        this ticket's tiers leaves the cell as it was. */
     if(String(val).trim()===""){ setTier(C.version, R.key, ""); return; }
     const tier=findTierByName(C.version, val);
     if(tier) setTier(C.version, R.key, tier.id);
   } else if(C.kind==="field"){
-    setAddrValue(R.key, C.key, val);
+    if(R.kind==="exception") setExcValue(R.address, R.version, C.key, val);
+    else setAddrValue(R.key, C.key, val);
   }
 }
 function clearRange(){
@@ -1634,13 +1873,13 @@ function selTSV(){
   return out.join("\n");
 }
 document.addEventListener("copy", e=>{
-  if(editing || !sel) return;
+  if(editing || vDraft || excDraft || !sel) return;
   e.clipboardData.setData("text/plain", selTSV());
   e.preventDefault();
   toast("Copied.");
 });
 document.addEventListener("paste", e=>{
-  if(editing || !sel) return;
+  if(editing || vDraft || excDraft || !sel) return;
   const txt=(e.clipboardData||window.clipboardData).getData("text/plain");
   if(!txt) return;
   e.preventDefault();
@@ -1668,7 +1907,7 @@ let dragging=false;
 viewhost.addEventListener("mousedown", e=>{
   /* The tier controls are buttons with their own click. Selecting the
      cell would re-render and detach them before the click lands. */
-  if(e.target.closest(".tier-chip, .tier-add, .tier-missing")) return;
+  if(e.target.closest(".tier-edit, .hd-action")) return;
   if(e.target.dataset.handle){ beginFill(e); return; }
   const td=e.target.closest("td[data-r]");
   if(!td) return;
@@ -1726,7 +1965,8 @@ viewhost.addEventListener("contextmenu", e=>{
 
 /* ============================ KEYBOARD ============================ */
 document.addEventListener("keydown", e=>{
-  if(editing) return;
+  /* The flyout owns the keyboard while it is open. */
+  if(editing || vDraft || excDraft) return;
   const mod=e.metaKey||e.ctrlKey;
   if(mod && e.key.toLowerCase()==="z"){ e.preventDefault(); e.shiftKey?redo():undo(); return; }
   if(mod && e.key.toLowerCase()==="y"){ e.preventDefault(); redo(); return; }
@@ -1790,7 +2030,7 @@ function versionMenu(e, vId){
   const n=addressesOn(vId).length;
   menu(e.clientX,e.clientY,
     `<div class="mlabel">Job ${esc(VER(vId).job)}${VER(vId).desc?" · "+esc(VER(vId).desc):""}</div>
-     <button data-a="open">${state.view==="master"?"Open distribution":"Open master tickets"}</button>
+     <button data-a="open">${state.view==="master"?"Open distribution":"Open tickets"}</button>
      <button data-a="dup">Duplicate master ticket</button><hr>
      <button class="danger" data-a="del">Delete master ticket</button>
      <div class="mnote">Its details and the quantities for ${n} address${n===1?"":"es"} go with it.</div>`,
@@ -1927,7 +2167,7 @@ function addShipField(id){
   begin();
   FIELDS.push({...c}); reindexFields();
   commit();
-  toast(`${c.name} added to shipping.`, "Undo", undo);
+  toast(`${c.name} added to delivery.`, "Undo", undo);
 }
 function fieldMenu(e, fId){
   const f=FIELD[fId];
@@ -1946,8 +2186,9 @@ function deleteField(fId){
   const nm=FIELD[fId].name;
   FIELDS=FIELDS.filter(f=>f.id!==fId); reindexFields();
   Object.keys(state.addrValues).forEach(k=>{ if(k.endsWith("::"+fId)) delete state.addrValues[k]; });
+  Object.values(state.shipExc).forEach(o=>{ delete o[fId]; });
   sel=null; commit();
-  toast(`${nm} removed from shipping.`, "Undo", undo);
+  toast(`${nm} removed from delivery.`, "Undo", undo);
 }
 
 /* ============================ STRUCTURAL OPS ============================ */
@@ -1987,6 +2228,7 @@ function deleteVersion(vId){
   state.versions=state.versions.filter(v=>v.id!==vId);
   Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[0]===vId) delete state.qtys[k]; });
   Object.keys(state.tierOf).forEach(k=>{ if(k.split("::")[0]===vId) delete state.tierOf[k]; });
+  Object.keys(state.shipExc).forEach(k=>{ if(k.split("::")[1]===vId) delete state.shipExc[k]; });
   sel=null; commit();
   toast("Master ticket deleted.", "Undo", undo);
 }
@@ -1996,6 +2238,7 @@ function removeAddress(aId){
   Object.keys(state.qtys).forEach(k=>{ if(k.split("::")[1]===aId) delete state.qtys[k]; });
   Object.keys(state.tierOf).forEach(k=>{ if(k.split("::")[1]===aId) delete state.tierOf[k]; });
   Object.keys(state.addrValues).forEach(k=>{ if(k.split("::")[0]===aId) delete state.addrValues[k]; });
+  Object.keys(state.shipExc).forEach(k=>{ if(k.split("::")[0]===aId) delete state.shipExc[k]; });
   sel=null; commit();
   toast("Address removed from the rollout.", "Undo", undo);
 }
@@ -2004,85 +2247,291 @@ function newAddress(){
   const id=nextId("a", state.addresses);
   state.addresses.push({id, name:"New address", city:"—"});
   commit();
-  setSel(0, state.addresses.length-1, 0, false);
+  /* Exception rows sit between addresses, so find the new row by key. */
+  const ri = TM(0) ? TM(0).rows.findIndex(r=>r.key===id) : -1;
+  if(ri>=0) setSel(0, ri, 0, false);
   toast("Address added. Name it, then enter its quantities on the distribution.", "Undo", undo);
 }
 
 /* ── Tier ops ──────────────────────────────────────────────────
-   Tiers are added, renamed and removed on the master ticket; which
-   tier an address gets is set on the distribution.
+   Versions (tiers) are managed in the Versions flyout: added, renamed,
+   removed, and assigned to locations. Distribution can still set a
+   location's version by typing its name.
    ------------------------------------------------------------- */
-function nextTierName(vId){
-  let n=tiersOf(vId).length+1;
-  while(findTierByName(vId, "V"+n)) n++;
-  return "V"+n;
-}
 const tierCellEl = vId => document.querySelector(`[data-table="master"] td[data-tiers="${vId}"]`);
 
-function addTier(vId){
-  const v=VER(vId); if(!v) return;
-  const first = !v.tiers.length;
-  const tier = {id:nextId("t", v.tiers), name:nextTierName(vId)};
-  begin();
-  v.tiers.push(tier);
-  /* With one tier there is only one answer, so everyone already on the
-     ticket goes on it. From the second tier on, the distribution is
-     where addresses are moved. */
-  const onIt = first ? addressesOn(vId) : [];
-  onIt.forEach(a=>setTier(vId, a.id, tier.id));
-  commit();
-  const td=tierCellEl(vId);
-  if(td) inlineRename(td, tier.name, val=>renameTier(vId, tier.id, val));
-  toast(onIt.length
-    ? `${tier.name} added. All ${onIt.length} addresses are on it until you move some on the distribution.`
-    : `${tier.name} added. Assign addresses to it on the distribution.`, "Undo", undo);
-}
-function renameTier(vId, tId, val){
-  const tier=TIER(vId, tId); if(!tier) return render();
-  const name=String(val??"").trim();
-  if(!name || name===tier.name) return render();
-  const clash=findTierByName(vId, name);
-  if(clash && clash.id!==tId){ render(); toast(`This ticket already has a version called ${clash.name}.`); return; }
-  begin(); tier.name=name; commit();
-}
-function removeTier(vId, tId){
-  const v=VER(vId), tier=TIER(vId, tId); if(!tier) return;
-  begin();
-  v.tiers=v.tiers.filter(t=>t.id!==tId);
+/* An each-location ticket stays one version per receiving location:
+   a location that gains a quantity gets a version named for it, and
+   one that loses its quantity drops its version. Runs inside commit(). */
+function syncPerLocation(v){
+  const on = addressesOn(v.id), onIds = new Set(on.map(a=>a.id));
   Object.keys(state.tierOf).forEach(k=>{
-    if(k.split("::")[0]===vId && state.tierOf[k]===tId) delete state.tierOf[k];
+    const [kv, ka] = k.split("::");
+    if(kv===v.id && !onIds.has(ka)) delete state.tierOf[k];
   });
-  sel=null; commit();
-  toast(`${tier.name} removed.`, "Undo", undo);
-}
-function tierMenu(e, vId, tId){
-  const tier=TIER(vId, tId), n=addressesOnTier(vId, tId).length;
-  const r=e.currentTarget.getBoundingClientRect();
-  const last = tiersOf(vId).length===1;
-  menu(r.left, r.bottom+4,
-    `<div class="mlabel">${esc(VER(vId).desc||VER(vId).job)} · ${esc(tier.name)}</div>
-     <button data-a="rename">Rename version</button>
-     <button data-a="dist">Assign on distribution</button><hr>
-     <button class="danger" data-a="del">Remove version</button>
-     <div class="mnote">${n
-       ? `${n} address${n===1?"":"es"} lose${n===1?"s":""} ${last?"it and the ticket becomes one design for everyone.":"their version and will need another."}`
-       : last ? "The ticket becomes one design for everyone." : "No addresses are on it yet."}</div>`,
-    m=>{
-      m.querySelector('[data-a="rename"]').onclick=()=>{ closeMenu();
-        const td=tierCellEl(vId);
-        if(td) inlineRename(td, tier.name, val=>renameTier(vId, tId, val));
-      };
-      m.querySelector('[data-a="dist"]').onclick=()=>{ closeMenu(); state.view="dist"; sel=null; render(); };
-      m.querySelector('[data-a="del"]').onclick=()=>{ closeMenu(); removeTier(vId, tId); };
-    });
+  const used = new Set(on.map(a=>getTier(v.id, a.id)));
+  v.tiers = v.tiers.filter(t=>used.has(t.id));
+  on.forEach(a=>{
+    if(TIER(v.id, getTier(v.id, a.id))) return;
+    let name=a.name, n=2;
+    while(findTierByName(v.id, name)) name=`${a.name} ${n++}`;
+    const t={id:nextId("t", v.tiers), name};
+    v.tiers.push(t);
+    setTier(v.id, a.id, t.id);
+  });
 }
 
-function wirePencil(th, getName, setName){
-  const b=th.querySelector(".pencil"); if(!b) return;
-  b.onclick=ev=>{ ev.stopPropagation();
-    inlineRename(th, getName(), val=>{ begin(); setName(val||getName()); commit(); });
-  };
+/* ============================ VERSIONS FLYOUT ============================
+   Markup is #versionsFlyout plus versionRowTemplate. Everything here
+   edits `vDraft`; only saveVersions() writes to state.
+     vDraft = { vId, perLocation, wasPerLocation, showErrors,
+                tiers:  [{id, name, job?}]    the version list
+                assign: {addressId: tierId} } current assignments, kept
+                                              so counts, first-version
+                                              auto-assign and removals
+                                              are right on Save
+   ------------------------------------------------------------------ */
+const vf = document.getElementById("versionsFlyout");
+const vfEl = id => document.getElementById(id);
+let vDraft = null;
+
+function openVersions(vId){
+  const v=VER(vId); if(!v) return;
+  vDraft = {vId, perLocation:!!v.perLocation, wasPerLocation:!!v.perLocation, showErrors:false,
+            tiers: JSON.parse(JSON.stringify(v.tiers||[])), assign:{}};
+  addressesOn(vId).forEach(a=>{
+    const t=getTier(vId, a.id);
+    if(TIER(vId, t)) vDraft.assign[a.id]=t;
+  });
+  vfEl("versionsFlyoutContext").textContent = `${v.desc || "Untitled ticket"} · ${v.job}`;
+  vfEl("versionsPerLocation").checked = vDraft.perLocation;
+  paintVersions();
+  vf.classList.add("open");
+  vfEl("versionsPerLocation").focus();
 }
+
+function closeVersions(){
+  if(!vDraft) return;
+  const {vId} = vDraft;
+  vDraft = null;
+  vf.classList.remove("open");
+  /* The cell was re-rendered, so focus goes to the new edit button. */
+  const td=tierCellEl(vId), btn=td && td.querySelector(".tier-edit");
+  if(btn) btn.focus();
+}
+
+const draftTier = tId => vDraft.tiers.find(t=>t.id===tId);
+const draftCount = tId => addressesOn(vDraft.vId).filter(a=>vDraft.assign[a.id]===tId).length;
+
+/* Names that cannot be saved: empty, or the same as another (case-
+   insensitive). Keyed by tier id. */
+function draftErrors(){
+  const seen = {}, errs = {};
+  vDraft.tiers.forEach(t=>{
+    const n = String(t.name??"").trim().toLowerCase();
+    if(!n){ errs[t.id] = "Give this version a name."; return; }
+    if(seen[n]) errs[t.id] = errs[seen[n]] = `More than one version is called "${t.name.trim()}".`;
+    else seen[n] = t.id;
+  });
+  return errs;
+}
+
+/* Whole repaint: mode and list. Called on open and after anything that
+   adds or removes a row (not on each keystroke, so focus stays). */
+function paintVersions(){
+  const d=vDraft, per=d.perLocation, n=addressesOn(d.vId).length;
+  vfEl("versionListSection").hidden = per;
+  vfEl("versionsModeHelp").hidden = !per;
+  vfEl("versionsModeHelp").textContent = !per ? "" : (d.wasPerLocation
+        ? `${plural(n, "location")}, each with its own version named for it. A location that gets a quantity later gets its own version too.`
+        : `Saving ${d.tiers.length ? `replaces ${plural(d.tiers.length, "current version")} with` : "creates"} ${plural(n, "version")}, one per location, each named for its location.`);
+
+  const list = vfEl("versionList"), rowTpl = vfEl("versionRowTemplate").content.firstElementChild;
+  list.replaceChildren();
+  d.tiers.forEach(t=>{
+    const row = rowTpl.cloneNode(true);
+    row.dataset.tier = t.id;
+    const inp = row.querySelector(".version-row__name");
+    inp.value = t.name;
+    inp.oninput = ()=>{ t.name = inp.value; if(d.showErrors) paintErrors(); };
+    row.querySelector(".version-row__remove").onclick = ()=>removeDraftTier(t.id);
+    list.appendChild(row);
+  });
+  vfEl("versionListEmpty").hidden = d.tiers.length > 0;
+
+  paintCounts();
+  paintErrors();
+}
+
+/* Per-version location counts. */
+function paintCounts(){
+  const d=vDraft;
+  vfEl("versionList").querySelectorAll(".version-row").forEach(row=>{
+    const t = draftTier(row.dataset.tier);
+    row.querySelector(".version-row__meta").textContent =
+      plural(draftCount(t.id), "location") + (t.job ? ` · job ${t.job}` : "");
+  });
+}
+
+/* A version list is empty or two or more: a single version
+   is the same thing as none. */
+const draftTooFew = () => !vDraft.perLocation && vDraft.tiers.length === 1;
+
+/* Inline errors show only after a Save attempt, then follow typing. */
+function paintErrors(){
+  const errs = vDraft.showErrors ? draftErrors() : {};
+  vfEl("versionListError").hidden = !(vDraft.showErrors && draftTooFew());
+  vfEl("versionList").querySelectorAll(".version-row").forEach(row=>{
+    const msg = errs[row.dataset.tier], e = row.querySelector(".version-row__error");
+    e.hidden = !msg; e.textContent = msg || "";
+    row.querySelector(".version-row__name").toggleAttribute("aria-invalid", !!msg);
+  });
+}
+
+function addDraftTier(){
+  const d=vDraft;
+  let n=d.tiers.length+1;
+  const taken = name => d.tiers.some(t=>t.name.trim().toLowerCase()===name.toLowerCase());
+  while(taken("V"+n)) n++;
+  const t = {id:nextId("t", d.tiers), name:"V"+n};
+  /* With one version there is only one answer, so every location
+     already on the ticket goes on it. */
+  if(!d.tiers.length) addressesOn(d.vId).forEach(a=>{ d.assign[a.id]=t.id; });
+  d.tiers.push(t);
+  paintVersions();
+  const inp = vfEl("versionList").querySelector(`[data-tier="${t.id}"] .version-row__name`);
+  inp.focus(); inp.select();
+}
+
+function removeDraftTier(tId){
+  const d=vDraft;
+  d.tiers = d.tiers.filter(t=>t.id!==tId);
+  Object.keys(d.assign).forEach(a=>{ if(d.assign[a]===tId) delete d.assign[a]; });
+  paintVersions();
+  vfEl("versionAdd").focus();
+}
+
+function saveVersions(){
+  const d=vDraft, v=VER(d.vId); if(!v) return closeVersions();
+  if(!d.perLocation && (Object.keys(draftErrors()).length || draftTooFew())){
+    d.showErrors = true; paintErrors();
+    const bad = vf.querySelector('[aria-invalid]');
+    (bad || vfEl("versionAdd")).focus();
+    return;
+  }
+  begin();
+  if(d.perLocation){
+    /* Already each-location: nothing to change. Newly switched on:
+       start from none and let syncPerLocation() (in commit) give every
+       receiving location a version named for it. */
+    if(!v.perLocation){
+      v.tiers = [];
+      Object.keys(state.tierOf).forEach(k=>{ if(k.split("::")[0]===v.id) delete state.tierOf[k]; });
+    }
+  } else {
+    v.tiers = d.tiers.map(t=>({...t, name:t.name.trim()}));
+    addressesOn(v.id).forEach(a=>setTier(v.id, a.id, draftTier(d.assign[a.id]) ? d.assign[a.id] : ""));
+    /* Locations off the ticket keep a version only if it still exists. */
+    Object.keys(state.tierOf).forEach(k=>{
+      if(k.split("::")[0]===v.id && !TIER(v.id, state.tierOf[k])) delete state.tierOf[k];
+    });
+  }
+  v.perLocation = d.perLocation;
+  const missing = d.perLocation ? 0 : untiered(v.id).length;
+  commit();
+  closeVersions();
+  toast(`Versions saved for ${v.desc || v.job}.` + (missing ? ` ${missing} location${missing===1?" still needs":"s still need"} a version.` : ""),
+    missing ? "Open distribution" : "Undo", missing ? ()=>{ state.view="dist"; sel=null; render(); } : undo);
+}
+
+vfEl("versionsPerLocation").addEventListener("change", e=>{
+  vDraft.perLocation = e.target.checked;
+  vDraft.showErrors = false;
+  paintVersions();
+});
+vfEl("versionAdd").addEventListener("click", addDraftTier);
+vfEl("versionsSave").addEventListener("click", saveVersions);
+vf.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click", closeVersions));
+/* A click on the dimmed overlay, not the panel, cancels. */
+vf.addEventListener("click", e=>{ if(e.target===vf) closeVersions(); });
+vf.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){ e.preventDefault(); closeVersions(); }
+  /* Enter in a name field saves, like the milestone flyout. */
+  if(e.key==="Enter" && e.target.matches("input[type=text]")){ e.preventDefault(); saveVersions(); }
+});
+
+/* ============================ SHIPPING EXCEPTIONS FLYOUT ============================
+   Markup is #shipExcFlyout plus shipExcRowTemplate. Edits excDraft;
+   only saveShipExc() writes to state.
+     excDraft = { aId, checked: Set<vId> }
+   ------------------------------------------------------------------ */
+const xf = document.getElementById("shipExcFlyout");
+let excDraft = null;
+
+function openShipExc(aId){
+  const a=ADDR(aId); if(!a) return;
+  excDraft = {aId, checked: new Set(excsFor(aId).map(v=>v.id))};
+  document.getElementById("shipExcContext").textContent = [a.name, a.city].filter(Boolean).join(" · ");
+  const list = document.getElementById("shipExcList");
+  const tpl  = document.getElementById("shipExcRowTemplate").content.firstElementChild;
+  list.replaceChildren();
+  versionsFor(aId).forEach(v=>{
+    const row = tpl.cloneNode(true);
+    const box = row.querySelector("input");
+    const changed = hasExc(aId, v.id) ? Object.keys(state.shipExc[excKey(aId, v.id)]).length : 0;
+    row.querySelector(".checkbox-title").textContent = lineName(aId, v);
+    row.querySelector(".checkbox-sub").textContent =
+      [fmtQty(getQty(v.id, aId)), "Job " + v.job, changed ? plural(changed, "field") + " changed" : ""]
+        .filter(Boolean).join(" · ");
+    box.checked = excDraft.checked.has(v.id);
+    box.onchange = ()=>{ box.checked ? excDraft.checked.add(v.id) : excDraft.checked.delete(v.id); };
+    list.appendChild(row);
+  });
+  document.getElementById("shipExcEmpty").hidden = list.children.length > 0;
+  xf.classList.add("open");
+  (list.querySelector("input") || xf.querySelector("[data-close]")).focus();
+}
+
+function closeShipExc(){
+  if(!excDraft) return;
+  const {aId} = excDraft;
+  excDraft = null;
+  xf.classList.remove("open");
+  const th = [...document.querySelectorAll('[data-table="ship"] tbody th.hd')]
+    .find(h=>h.dataset.row===aId);
+  const btn = th && th.querySelector(".hd-action");
+  if(btn) btn.focus();
+}
+
+function saveShipExc(){
+  const {aId, checked} = excDraft;
+  let added=0, removed=0;
+  begin();
+  versionsFor(aId).forEach(v=>{
+    const k=excKey(aId, v.id);
+    if(checked.has(v.id) && !state.shipExc[k]){ state.shipExc[k]={}; added++; }
+    if(!checked.has(v.id) && state.shipExc[k]){ delete state.shipExc[k]; removed++; }
+  });
+  const name = ADDR(aId).name;
+  commit();
+  closeShipExc();
+  if(added || removed) toast(`Shipping exceptions saved for ${name}.`, "Undo", undo);
+}
+
+document.getElementById("shipExcSave").addEventListener("click", saveShipExc);
+xf.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click", closeShipExc));
+xf.addEventListener("click", e=>{ if(e.target===xf) closeShipExc(); });
+xf.addEventListener("keydown", e=>{ if(e.key==="Escape"){ e.preventDefault(); closeShipExc(); } });
+
+/* Row header buttons (edit, delete): cloned from their template into
+   the header's .cellpad, in call order. */
+function addRowButton(th, tplId, label, onClick){
+  const b=document.getElementById(tplId).content.firstElementChild.cloneNode(true);
+  b.setAttribute("aria-label", label); b.title=label;
+  b.onclick=ev=>{ ev.stopPropagation(); onClick(); };
+  th.querySelector(".cellpad").appendChild(b);
+}
+const addRowDelete = (th, label, onDelete) => addRowButton(th, "rowDeleteTemplate", label, onDelete);
 function inlineRename(host, cur, done){
   const inp=document.createElement("input");
   inp.className="editor"; inp.value=cur; host.appendChild(inp); inp.focus(); inp.select();
@@ -2128,7 +2577,7 @@ document.getElementById("shipTracker").onclick=()=>{
 };
 document.getElementById("createTickets").onclick=()=>{
   /* A tiered ticket with an address on no tier cannot be spun off —
-     nobody has said which design that address gets. */
+     nobody has said which version that address gets. */
   const missing=state.versions.reduce((n,v)=>n+untiered(v.id).length, 0);
   if(missing){
     toast(`${missing} address${missing===1?" needs":"es need"} a version first.`, "Open distribution", ()=>{
@@ -2194,15 +2643,45 @@ render();
            ColumnReorder     → wireColumnDrag() / moveColumn(); .hd-move,
                                .hd-pinned, .grip, .is-dragging, .drop-before,
                                .drop-after styles
-           TierCell          → <template id="tierCellTemplate"> + <template
-                               id="tierChipTemplate">, filled by tierCell();
-                               .tier-cell, .tier-chip (on the shared .pill),
-                               .tier-add, .tier-missing (on .pill-warn) styles
+           TierCell          → <template id="tierCellTemplate">, filled by
+                               tierCell(); .tier-cell, .tier-cell__count,
+                               .tier-edit (on the shared .icon-btn) styles.
+                               Read-only: the version count; the edit button
+                               opens VersionsFlyout
+           Master tickets sub-label → "N master tickets · N production
+                               tickets"; productionCount() is one per version,
+                               or one for a ticket with none
+           VersionsFlyout    → #versionsFlyout markup (after .main-content) on
+                               components/flyout/flyout.css + the shared
+                               switch (components/switch). Sub-components:
+                                 VersionMode  → .versions-flyout__mode
+                                 VersionList  → #versionList + <template
+                                                id="versionRowTemplate">,
+                                                .version-list / .version-row
+                               Styles: "Versions flyout" block in
+                               rollout-manager.css (.versions-flyout__*,
+                               .input, .field-error)
+           RowDelete         → <template id="rowDeleteTemplate"> (the shared
+                               .icon-btn), cloned by addRowDelete() into master
+                               ticket and address row headers, and
+                               <template id="rowEditTemplate"> on address rows
+                               on Delivery; .hd-action styles.
+                               Row headers do not select on click; hovering
+                               one tints its row (tr:has(> th.hd:hover))
+                               Deletes with an Undo toast; the right-click menus
+                               still offer the same actions
+           Cell geometry     → every th/td has 8px padding (--scale-200) and no
+                               set height; .cellpad / .val only lay out. Icon
+                               buttons in a cell pull in by --rm-cell-icon-pull
+                               so rows stay one text line tall. The thead is
+                               sticky as a whole, so the two-row head needs no
+                               row-height offset
            CellEditor        → input.editor mounted by mountEditor(), .editor styles
            ContextMenu       → built by menu(), .menu styles
            Toast             → built by toast(), .toast styles
 
-         What each tab shows
+         What each tab shows (tab labels: Overview, Tickets, Delivery,
+         Distribution; in code the views are still "master" / "ship")
            Overview          → the default tab. The header holds the rollout
                                name and customer; Details holds CSR and Sales
                                with avatars (ROLLOUT_PEOPLE) and the rollup.
@@ -2221,7 +2700,7 @@ render();
                                live: it follows edits on the other tabs, and
                                lists "No version yet" for addresses on a
                                multi-version ticket with none assigned.
-           Master tickets    → a STACK of tables, because several parts can go
+           Tickets           → a STACK of tables, because several parts can go
                                into the one piece that ships and each part has
                                its own specs.
 
@@ -2236,13 +2715,34 @@ render();
                                ticket (Main Menu Card T1 / T2, To Go Menu Retro
                                East / Core High): same specs, different art.
                                The Versions cell shows a chip per version with
-                               its address count; + adds one, clicking a chip
-                               renames or removes it. Adding the FIRST version
-                               puts every address already on the ticket on it
-                               (the only possible answer); later ones start
-                               empty. A "N need a version" warning shows while
-                               any address with a quantity has none. A ticket
-                               with no versions is one design for everyone.
+                               its location count and an edit button; the
+                               button, any chip, the warning pill, or Enter /
+                               Space on the cell opens the Versions flyout.
+                               There, on a draft saved as one undo step:
+                                 - add, rename and remove versions (names
+                                   must be non-empty and unique, and the list
+                                   is none or at least two — one version is
+                                   refused; errors show on Save, in
+                                   --color-red-900 help text);
+                                 - or switch on "Every location gets its own
+                                   version" (v.perLocation): one version per
+                                   location, named for it. The cell then
+                                   shows a single "Each location" chip, the
+                                   Distribution Version column is read-only,
+                                   and syncPerLocation() (run in commit())
+                                   gives a location that gains a quantity its
+                                   own version and drops the version of one
+                                   that loses it. Switching back keeps those
+                                   versions as an ordinary list.
+                               Which location gets which shared version is set
+                               on Distribution only — the flyout has no
+                               location list.
+                               Adding the FIRST version puts every location
+                               already on the ticket on it (the only possible
+                               answer); later ones start empty. A location
+                               with a quantity and no version is flagged only
+                               on Distribution. A ticket with no versions
+                               shows "One version" in the cell.
 
          NAMING — read this before porting. The UI says "version"; the code
          says `tier` (v.tiers, state.tierOf, tierCell(), .tier-* classes),
@@ -2282,9 +2782,27 @@ render();
                                because the data has a detail there, and it
                                disappears when the last ticket loses it. That
                                is why nothing on these tables creates one.
-           Shipping          → every address down the side, then the JM
-                               shipping fields (SHIP_CATALOG), which are per
-                               address only. "+ Add field" lives here.
+           Delivery          → every address down the side, then Receives
+                               (read-only, from Distribution: "200 Main Menu
+                               Card — T1, 100 Dessert Menu Card"), then the JM
+                               shipping fields (SHIP_CATALOG). The fields are
+                               fixed here: no "+ Add field", no reordering.
+                               The row header's edit button opens the Shipping
+                               exceptions flyout: one JM .checkbox-row per
+                               ticket the address receives. A checked ticket
+                               becomes a child row under the address
+                               (state.shipExc["aId::vId"]) with a blank Address
+                               cell; its Receives cell names the ticket, and
+                               the address row's Receives drops it. It holds only the
+                               fields changed for it; the rest show the
+                               address's value in grey (td.inherited) and
+                               follow it. Clearing a field there reverts it
+                               to the address's value.
+           ShippingExceptionsFlyout → #shipExcFlyout + <template
+                               id="shipExcRowTemplate">; .checkbox-list /
+                               .checkbox-row styles (copied from JM's
+                               create-customer modal). Draft in excDraft,
+                               Save is one undo step.
            Distribution      → every address down the side; one column group
                                per master ticket, headed by its description:
                                Quantity, then Version if the ticket has
@@ -2298,7 +2816,7 @@ render();
          record: receives() is "has a non-empty quantity", so there is no
          separate list of which addresses are on which version to keep in
          step. state.tierOf uses the same key and holds a version (tier) id
-         from that master ticket's tiers array; it says which design, never
+         from that master ticket's tiers array; it says which version, never
          whether. Clearing a quantity leaves the version in place (so
          pasting version then quantity works); it is ignored while there is
          no quantity. A version may carry its own job number (tier.job) —
@@ -2317,10 +2835,16 @@ render();
              dashboard keeps its own in-memory copy, so an edit on one page does
              not reach the other — in Angular both read the same rollout from
              the service. Customer and CSR lists are rollout-customers.js.
-           - View switching (Overview / Master tickets / Shipping / Distribution) →
+           - View switching (Overview / Tickets / Delivery / Distribution) →
              component state + router params.
            - Version add/rename/remove, the first-version auto-assign, and
-             the needs-a-version check → methods on the rollout service. A
+             the needs-a-version check → methods on the rollout service.
+           - The Versions flyout's draft (vDraft) → a reactive form in the
+             flyout component, seeded on open and emitted on Save; Cancel
+             drops it. Open/close, overlay click and Esc → the team's
+             flyout/dialog component, which should also own the focus
+             trap and inert background this prototype does not simulate.
+             syncPerLocation() → rollout service, on any quantity change. A
              pasted version name that is not on the ticket is ignored, not
              refused with a message; typing is validated.
            - The type-ahead is autocomplete() — inline completion, a filtered
