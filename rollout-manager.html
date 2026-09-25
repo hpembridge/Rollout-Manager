@@ -51,7 +51,7 @@
         <nav class="breadcrumbs">
           <a class="crumb" href="#"><i class="fa-regular fa-folder"></i> Jobs</a>
           <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
-          <a class="crumb" href="rollout-dashboard.html">Rollouts</a>
+          <a class="crumb" href="index.html">Rollouts</a>
           <span class="crumb-sep"><i class="fa-regular fa-chevron-right"></i></span>
           <span class="crumb current" id="rolloutCrumb"></span>
         </nav>
@@ -63,7 +63,7 @@
            ───────────────────────────────────────────────────── -->
       <header class="rollout-topbar">
         <div class="page-width rollout-topbar__inner">
-          <a class="btn-ghost rollout-back" href="rollout-dashboard.html">
+          <a class="btn-ghost rollout-back" href="index.html">
             <i class="fa-regular fa-arrow-left" aria-hidden="true"></i> All rollouts
           </a>
           <span class="rollout-topbar__divider" aria-hidden="true"></span>
@@ -2685,7 +2685,7 @@ render();
            ViewTabs          → .tab-row markup here; button is the shared
                                .tab-btn, row styles in rollout-manager.css
            BackLink          → a.rollout-back in the topbar (the shared .btn-ghost),
-                               to rollout-dashboard.html
+                               to index.html
            RolloutOutputs    → #shipTracker / #createTickets in the topbar
            Overview          → <div class="overview"> markup, filled by
                                renderOverview(); .ov-header (name left,
@@ -2966,7 +2966,7 @@ render();
              picks one from ?rollout= into window.ROLLOUT_DATA, which feeds
              state and SPECS; the header reads rollout.customer and
              rollout.name. In Angular: a route param and an API call.
-           - The "Rollouts" breadcrumb goes to rollout-dashboard.html.
+           - The "Rollouts" breadcrumb goes to index.html.
            - toast() and its 5.2s timer.
            - inlineRename() reusing .editor for header renames.
          ══════════════════════════════════════════════════════════ -->
